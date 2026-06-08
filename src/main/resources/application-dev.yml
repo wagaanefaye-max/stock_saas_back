@@ -1,0 +1,62 @@
+# Development Profile Configuration
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/stock_saas_db
+    username: admin
+    password: changeme
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      connection-timeout: 30000
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      auto-commit: false  # Désactiver autoCommit pour permettre les transactions
+      connection-test-query: SELECT 1
+  
+  jpa:
+    hibernate:
+      ddl-auto: update  # Crée et supprime les tables à chaque démarrage (dev uniquement)
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: UTC
+        connection:
+          provider_disables_autocommit: true
+  
+  # Configuration Flyway - DÉSACTIVÉ (utilisation du DataSeeder Java uniquement)
+  flyway:
+    enabled: false
+  
+  # Désactivation complète de JMX et DevTools Remote
+  devtools:
+    remote:
+      enabled: false
+    restart:
+      enabled: true
+    livereload:
+      enabled: false
+
+logging:
+  level:
+    root: INFO
+    sun:
+      rmi: INFO
+    com.stocksaas: DEBUG
+    org.springframework: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+
+# Configuration Swagger pour le développement
+springdoc:
+  swagger-ui:
+    enabled: true
+    try-it-out-enabled: true
+    filter: true
+  show-actuator: false
+
+# URL de base de l'API (pour les liens de téléchargement de facture envoyés par email)
+app:
+  base-url: http://localhost:4200

@@ -1,0 +1,88 @@
+spring:
+  application:
+    admin:
+      enabled: false
+    name: stock-saas-backend
+  profiles:
+    # Profil actif par défaut (remplacer par -Dspring.profiles.active=prod en prod)
+    active: prod
+  # Configuration DataSource par défaut (utilisée si aucun profil ou profil dev)
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/stock_saas_db}
+    username: ${DB_USERNAME:nevrose}
+    password: "${DB_PASSWORD:sunuboutik@2026}"
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    show-sql: false
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
+  # Désactivation complète de JMX pour éviter les erreurs RMI
+  jmx:
+    enabled: false
+  # Configuration SMTP pour l'envoi d'emails
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: wagaanefaye@gmail.com
+    password: rqdp wcsk iafk ahki
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
+server:
+  port: 8080
+
+app:
+  base-url: ${APP_BASE_URL:http://localhost:4200}
+  upload:
+    subscriptions-dir: uploads/subscriptions
+  subscription:
+    reminders:
+      enabled: ${SUBSCRIPTION_REMINDERS_ENABLED:true}
+      # Tous les jours à 08:00
+      cron: ${SUBSCRIPTION_REMINDERS_CRON:0 0 8 * * *}
+
+# Désactivation complète de JMX et RMI
+management:
+  endpoints:
+    jmx:
+      exposure:
+        exclude: "*"
+  endpoint:
+    jmx:
+      enabled: false
+
+# Configuration Swagger/OpenAPI
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    operations-sorter: method
+    tags-sorter: alpha
+    try-it-out-enabled: true
+  show-actuator: false
+
+# Configuration JWT
+jwt:
+  secret: StockSaaSSecretKeyForJWTTokenGeneration2024SecureAndLongEnoughForHS512Algorithm
+  expiration: 86400000 # 24 heures en millisecondes
+
+# Cookie d'authentification (HttpOnly, envoyé automatiquement par le navigateur)
+auth:
+  cookie:
+    name: auth_token
+    max-age-seconds: 86400 # 24 heures (aligné sur JWT)
+    secure: false          # true en prod (défini dans application-prod.yml)
+    same-site: Lax         # None en prod pour appels cross-site
+
