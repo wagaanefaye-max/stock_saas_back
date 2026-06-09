@@ -37,7 +37,9 @@ import java.util.stream.Collectors;
                 "http://localhost:4200",
                 "http://localhost:3000",
                 "http://sen-stocksaas.com",
-                "https://sen-stocksaas.com"
+                "https://sen-stocksaas.com",
+                "http://164.132.43.247",
+                "http://164.132.43.247:4200"
         },
         allowCredentials = "true"
 )

@@ -51,8 +51,9 @@ logging:
 
 auth:
   cookie:
-    secure: true
-    same-site: None
+    # HTTP (IP:8080) : secure=false + Lax. En HTTPS : AUTH_COOKIE_SECURE=true, AUTH_COOKIE_SAME_SITE=None
+    secure: ${AUTH_COOKIE_SECURE:false}
+    same-site: ${AUTH_COOKIE_SAME_SITE:Lax}
 
 springdoc:
   swagger-ui:
