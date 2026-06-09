@@ -3,6 +3,7 @@ package com.stocksaas.service;
 import com.stocksaas.dto.SubscriptionDurationDTO;
 import com.stocksaas.dto.SubscriptionPlanOptionDTO;
 import com.stocksaas.dto.SubscriptionRecordDTO;
+import com.stocksaas.dto.SubscriptionRequestsPageResponse;
 import com.stocksaas.dto.SubscriptionStatusDTO;
 import com.stocksaas.model.Company;
 import com.stocksaas.model.CompanySubscriptionRecord;
@@ -20,6 +21,10 @@ import com.stocksaas.subscription.SubscriptionRequestStatusCode;
 import com.stocksaas.subscription.SubscriptionStatusCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.transaction.annotation.Propagation;
@@ -217,6 +222,44 @@ public class SubscriptionService {
                         || statusFilter.equalsIgnoreCase(r.getRequestStatus()))
                 .map(r -> toRecordDto(r, adminEmail))
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public SubscriptionRequestsPageResponse listAllRequestsForAdminPaged(
+            String adminEmail, String statusFilter, int page, int size) {
+        requireSuperAdmin(adminEmail);
+        int safeSize = Math.min(Math.max(size, 1), 100);
+        int safePage = Math.max(page, 0);
+        Pageable pageable = PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "createdAt"));
+
+        Page<CompanySubscriptionRecord> recordPage;
+        if (statusFilter == null || statusFilter.isBlank() || "ALL".equalsIgnoreCase(statusFilter)) {
+            recordPage = subscriptionRecordRepository.findByIsDeletedFalseOrderByCreatedAtDesc(pageable);
+        } else {
+            recordPage = subscriptionRecordRepository
+                    .findByRequestStatusAndIsDeletedFalseOrderByCreatedAtDesc(statusFilter.toUpperCase(), pageable);
+        }
+
+        List<SubscriptionRecordDTO> content = recordPage.getContent().stream()
+                .map(r -> toRecordDto(r, adminEmail))
+                .toList();
+
+        return SubscriptionRequestsPageResponse.builder()
+                .content(content)
+                .page(recordPage.getNumber())
+                .size(recordPage.getSize())
+                .totalElements(recordPage.getTotalElements())
+                .totalPages(recordPage.getTotalPages())
+                .first(recordPage.isFirst())
+                .last(recordPage.isLast())
+                .totalAll(subscriptionRecordRepository.countByIsDeletedFalse())
+                .totalPending(subscriptionRecordRepository.countByRequestStatusAndIsDeletedFalse(
+                        SubscriptionRequestStatusCode.PENDING))
+                .totalApproved(subscriptionRecordRepository.countByRequestStatusAndIsDeletedFalse(
+                        SubscriptionRequestStatusCode.APPROVED))
+                .totalRejected(subscriptionRecordRepository.countByRequestStatusAndIsDeletedFalse(
+                        SubscriptionRequestStatusCode.REJECTED))
+                .build();
     }
 
     @Transactional(readOnly = true)

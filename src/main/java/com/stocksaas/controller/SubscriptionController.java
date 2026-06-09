@@ -4,6 +4,7 @@ import com.stocksaas.dto.RejectSubscriptionRequest;
 import com.stocksaas.dto.SubscriptionDurationDTO;
 import com.stocksaas.dto.SubscriptionPlanOptionDTO;
 import com.stocksaas.dto.SubscriptionRecordDTO;
+import com.stocksaas.dto.SubscriptionRequestsPageResponse;
 import com.stocksaas.dto.SubscriptionStatusDTO;
 import com.stocksaas.service.SubscriptionService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -84,11 +85,14 @@ public class SubscriptionController {
 
     @GetMapping("/requests")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    @Operation(summary = "Toutes les souscriptions", description = "Super admin — filtre optionnel : PENDING, APPROVED, REJECTED")
-    public ResponseEntity<List<SubscriptionRecordDTO>> listAllRequests(
+    @Operation(summary = "Toutes les souscriptions", description = "Super admin — pagination et filtre optionnel : PENDING, APPROVED, REJECTED")
+    public ResponseEntity<SubscriptionRequestsPageResponse> listAllRequests(
             @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
             @AuthenticationPrincipal UserDetails userDetails) {
-        return ResponseEntity.ok(subscriptionService.listAllRequestsForAdmin(userDetails.getUsername(), status));
+        return ResponseEntity.ok(subscriptionService.listAllRequestsForAdminPaged(
+                userDetails.getUsername(), status, page, size));
     }
 
     @GetMapping("/requests/pending")
