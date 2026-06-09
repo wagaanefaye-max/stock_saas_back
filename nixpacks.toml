@@ -5,15 +5,9 @@ NIXPACKS_JDK_VERSION = "21"
 [phases.setup]
 nixPkgs = ["jdk21", "maven"]
 
-# Le paquet maven Nix peut pointer JAVA_HOME vers une JDK plus ancienne : forcer JDK 21
+# Une seule commande : JAVA_HOME ne persiste pas entre plusieurs RUN Docker
 [phases.build]
-cmds = [
-  "export JAVA_HOME=$(ls -d /nix/store/*-openjdk-21* 2>/dev/null | head -1)",
-  "export PATH=$JAVA_HOME/bin:$PATH",
-  "java -version",
-  "javac --version",
-  "mvn -DoutputFile=target/mvn-dependency-list.log -B -DskipTests clean dependency:list install"
-]
+cmds = ["bash scripts/build-nixpacks.sh"]
 
 [start]
 cmd = "java -Dserver.port=$PORT $JAVA_OPTS -jar target/*jar"
