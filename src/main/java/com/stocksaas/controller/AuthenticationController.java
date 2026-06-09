@@ -134,8 +134,10 @@ public class AuthenticationController {
     public ResponseEntity<Map<String, String>> logout() {
         ResponseCookie clearCookie = ResponseCookie.from(authCookieName, "")
                 .httpOnly(true)
+                .secure(authCookieSecure)
                 .path("/")
                 .maxAge(0)
+                .sameSite(authCookieSameSite)
                 .build();
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, clearCookie.toString())

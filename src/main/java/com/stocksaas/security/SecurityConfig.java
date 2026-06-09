@@ -54,6 +54,7 @@ public class SecurityConfig {
                     "/api/auth/register",
                     "/api/auth/verify-account",
                     "/api/auth/forgot-password",
+                    "/api/auth/logout",
                     "/api/public/invoices/**",
                     "/swagger-ui/**",
                     "/swagger-ui.html",
@@ -61,8 +62,6 @@ public class SecurityConfig {
                     "/v3/api-docs/**",
                     "/error"
                 ).permitAll()
-                // Route de déconnexion nécessite une authentification
-                .requestMatchers("/api/auth/logout").authenticated()
                 // Toutes les autres routes nécessitent une authentification
                 .anyRequest().authenticated()
             )
