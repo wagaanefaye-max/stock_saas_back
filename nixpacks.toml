@@ -1,6 +1,19 @@
-# Force JDK 21 (le projet compile avec maven.compiler.release=21)
+# JDK 21 requis (pom.xml: maven.compiler.release=21)
+[variables]
+NIXPACKS_JDK_VERSION = "21"
+
 [phases.setup]
 nixPkgs = ["jdk21", "maven"]
+
+# Le paquet maven Nix peut pointer JAVA_HOME vers une JDK plus ancienne : forcer JDK 21
+[phases.build]
+cmds = [
+  "export JAVA_HOME=$(ls -d /nix/store/*-openjdk-21* 2>/dev/null | head -1)",
+  "export PATH=$JAVA_HOME/bin:$PATH",
+  "java -version",
+  "javac --version",
+  "mvn -DoutputFile=target/mvn-dependency-list.log -B -DskipTests clean dependency:list install"
+]
 
 [start]
 cmd = "java -Dserver.port=$PORT $JAVA_OPTS -jar target/*jar"
