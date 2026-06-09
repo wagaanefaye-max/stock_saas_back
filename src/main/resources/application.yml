@@ -4,7 +4,7 @@ spring:
       enabled: false
     name: stock-saas-backend
   profiles:
-    # Profil actif par défaut (remplacer par -Dspring.profiles.active=prod en prod)
+    # Profil actif par défaut (remplacer par -Dspring.profiles.active=prod en prod)dfsfsfs
     active: prod
   # Configuration DataSource par défaut (utilisée si aucun profil ou profil dev)
   datasource:
