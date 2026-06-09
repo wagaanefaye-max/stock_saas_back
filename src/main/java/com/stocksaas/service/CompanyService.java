@@ -121,21 +121,21 @@ public class CompanyService {
             throw new RuntimeException("L'entreprise a été supprimée");
         }
         
-        // Convertir le statut string en code (ACTIF, INACTIF, SUSPENDU)
+        // Normaliser vers les codes référentiel (Actif, Inactif, Suspendu)
         String statusCodeInput = request.getStatus();
         if (statusCodeInput != null) {
-            // Normaliser le statut
             final String statusCode;
-            if (statusCodeInput.equalsIgnoreCase("Actif")) {
-                statusCode = "ACTIF";
-            } else if (statusCodeInput.equalsIgnoreCase("Inactif")) {
-                statusCode = "INACTIF";
-            } else if (statusCodeInput.equalsIgnoreCase("Suspendu")) {
-                statusCode = "SUSPENDU";
+            String normalized = statusCodeInput.trim();
+            if (normalized.equalsIgnoreCase("Actif") || normalized.equalsIgnoreCase("ACTIF")) {
+                statusCode = "Actif";
+            } else if (normalized.equalsIgnoreCase("Inactif") || normalized.equalsIgnoreCase("INACTIF")) {
+                statusCode = "Inactif";
+            } else if (normalized.equalsIgnoreCase("Suspendu") || normalized.equalsIgnoreCase("SUSPENDU")) {
+                statusCode = "Suspendu";
             } else {
-                statusCode = statusCodeInput.toUpperCase();
+                statusCode = normalized;
             }
-            
+
             CompanyStatus status = companyStatusRepository.findById(statusCode)
                     .orElseThrow(() -> new RuntimeException("Statut non trouvé: " + statusCode));
             company.setStatus(status);
