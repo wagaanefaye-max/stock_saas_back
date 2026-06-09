@@ -1,0 +1,6 @@
+# Force JDK 21 (le projet compile avec maven.compiler.release=21)
+[phases.setup]
+nixPkgs = ["jdk21", "maven"]
+
+[start]
+cmd = "java -Dserver.port=$PORT $JAVA_OPTS -jar target/*jar"
