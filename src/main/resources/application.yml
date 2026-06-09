@@ -44,7 +44,7 @@ server:
 app:
   base-url: ${APP_BASE_URL:http://localhost:4200}
   cors:
-    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:4200,http://localhost:3000,http://sen-stocksaas.com,https://sen-stocksaas.com,http://164.132.43.247,http://164.132.43.247:4200}
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:4200,http://localhost:3000,http://sen-stocksaas.com,https://sen-stocksaas.com,https://www.sen-stocksaas.com,http://164.132.43.247,https://164.132.43.247,http://164.132.43.247:4200}
   upload:
     subscriptions-dir: uploads/subscriptions
   subscription:
@@ -87,4 +87,5 @@ auth:
     max-age-seconds: 86400 # 24 heures (aligné sur JWT)
     secure: false          # true en prod (défini dans application-prod.yml)
     same-site: Lax         # None en prod pour appels cross-site
+    domain:                # vide en local ; .sen-stocksaas.com en prod
 

@@ -11,13 +11,11 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
+import com.stocksaas.security.AuthCookieFactory;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.Duration;
 import java.util.Map;
 
 /**
@@ -40,35 +38,18 @@ import java.util.Map;
 )
 public class AuthenticationController {
 
-    @Value("${auth.cookie.name:auth_token}")
-    private String authCookieName;
-
-    @Value("${auth.cookie.max-age-seconds:86400}")
-    private long authCookieMaxAgeSeconds;
-
-    @Value("${auth.cookie.secure:false}")
-    private boolean authCookieSecure;
-
-    @Value("${auth.cookie.same-site:Lax}")
-    private String authCookieSameSite;
-
     private final AuthService authService;
+    private final AuthCookieFactory authCookieFactory;
 
     @PostMapping("/login")
     @Operation(summary = "Connexion", description = "Authentifie un utilisateur et définit un cookie HttpOnly contenant le JWT")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
         try {
             AuthResponse response = authService.login(request);
-            ResponseCookie cookie = ResponseCookie.from(authCookieName, response.getToken())
-                    .httpOnly(true)
-                    .secure(authCookieSecure)
-                    .path("/")
-                    .maxAge(Duration.ofSeconds(authCookieMaxAgeSeconds))
-                    .sameSite(authCookieSameSite)
-                    .build();
+            String token = response.getToken();
             response.setToken(null);
             return ResponseEntity.ok()
-                    .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                    .header(HttpHeaders.SET_COOKIE, authCookieFactory.createTokenCookie(token).toString())
                     .body(response);
         } catch (org.springframework.security.authentication.BadCredentialsException e) {
             return ResponseEntity.status(401).body(Map.of("message", "Email ou mot de passe incorrect"));
@@ -111,16 +92,10 @@ public class AuthenticationController {
     public ResponseEntity<?> verifyAccount(@Valid @RequestBody VerifyAccountRequest request) {
         try {
             AuthResponse response = authService.verifyAccount(request);
-            ResponseCookie cookie = ResponseCookie.from(authCookieName, response.getToken())
-                    .httpOnly(true)
-                    .secure(authCookieSecure)
-                    .path("/")
-                    .maxAge(Duration.ofSeconds(authCookieMaxAgeSeconds))
-                    .sameSite(authCookieSameSite)
-                    .build();
+            String token = response.getToken();
             response.setToken(null);
             return ResponseEntity.ok()
-                    .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                    .header(HttpHeaders.SET_COOKIE, authCookieFactory.createTokenCookie(token).toString())
                     .body(response);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
@@ -132,15 +107,8 @@ public class AuthenticationController {
     @PostMapping("/logout")
     @Operation(summary = "Déconnexion", description = "Supprime le cookie d'authentification")
     public ResponseEntity<Map<String, String>> logout() {
-        ResponseCookie clearCookie = ResponseCookie.from(authCookieName, "")
-                .httpOnly(true)
-                .secure(authCookieSecure)
-                .path("/")
-                .maxAge(0)
-                .sameSite(authCookieSameSite)
-                .build();
         return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, clearCookie.toString())
+                .header(HttpHeaders.SET_COOKIE, authCookieFactory.createClearCookie().toString())
                 .body(Map.of("message", "Déconnexion réussie"));
     }
 }
