@@ -142,7 +142,7 @@ public class SubscriptionService {
             throw new RuntimeException("Moyen de paiement invalide. Choisissez Wave ou Orange Money");
         }
 
-        String proofPath = proofStorageService.storeProof(proofFile, companyId);
+        var storedProof = proofStorageService.storeProof(proofFile, companyId);
         double amountPaid = calculateAmount(duration);
 
         CompanySubscriptionRecord record = new CompanySubscriptionRecord();
@@ -155,7 +155,9 @@ public class SubscriptionService {
         record.setAmountPaid(amountPaid);
         record.setRequestStatus(SubscriptionRequestStatusCode.PENDING);
         record.setPaymentProvider(paymentProvider);
-        record.setProofFilePath(proofPath);
+        record.setProofFilePath(storedProof.filePath());
+        record.setProofFileData(storedProof.data());
+        record.setProofContentType(storedProof.contentType());
         record.setSubscribedByEmail(requesterEmail);
         record.setIsDeleted(false);
         record = subscriptionRecordRepository.save(record);
@@ -263,7 +265,7 @@ public class SubscriptionService {
     }
 
     @Transactional(readOnly = true)
-    public Resource getProofResource(Long recordId, String userEmail) throws java.io.IOException {
+    public com.stocksaas.dto.ProofResourceResult getProofResource(Long recordId, String userEmail) throws java.io.IOException {
         CompanySubscriptionRecord record = subscriptionRecordRepository.findByIdAndIsDeletedFalse(recordId)
                 .orElseThrow(() -> new RuntimeException("Demande non trouvée"));
         User user = userRepository.findByEmailWithCompanyAndRole(userEmail)
@@ -274,7 +276,10 @@ public class SubscriptionService {
                 throw new RuntimeException("Accès non autorisé au justificatif");
             }
         }
-        return proofStorageService.loadProof(record.getProofFilePath());
+        if (record.getProofFilePath() == null && (record.getProofFileData() == null || record.getProofFileData().length == 0)) {
+            throw new com.stocksaas.exception.ProofNotFoundException("Aucun justificatif n'est associé à cette demande.");
+        }
+        return proofStorageService.loadProof(record);
     }
 
     private CompanySubscriptionRecord getPendingRecord(Long recordId) {
@@ -368,13 +373,18 @@ public class SubscriptionService {
                 .requestStatusLabel(requestStatusLabel(status))
                 .paymentProvider(record.getPaymentProvider())
                 .paymentProviderLabel(PaymentProviderCode.label(record.getPaymentProvider()))
-                .proofUrl(record.getProofFilePath() != null
+                .proofUrl(hasProof(record)
                         ? "/api/subscriptions/requests/" + record.getId() + "/proof"
                         : null)
                 .validatedByEmail(record.getValidatedByEmail())
                 .validatedAt(record.getValidatedAt())
                 .rejectionReason(record.getRejectionReason())
                 .build();
+    }
+
+    private static boolean hasProof(CompanySubscriptionRecord record) {
+        return (record.getProofFilePath() != null && !record.getProofFilePath().isBlank())
+                || (record.getProofFileData() != null && record.getProofFileData().length > 0);
     }
 
     private static String requestStatusLabel(String status) {

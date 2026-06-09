@@ -1,6 +1,8 @@
 package com.stocksaas.repository;
 
 import com.stocksaas.model.Inventory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -24,4 +26,27 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
 
     @Query("SELECT i FROM Inventory i WHERE i.company.id = :companyId AND i.warehouse.id = :warehouseId AND i.isDeleted = false AND i.status IN ('DRAFT', 'IN_PROGRESS')")
     List<Inventory> findOpenByCompanyIdAndWarehouseId(@Param("companyId") Long companyId, @Param("warehouseId") Long warehouseId);
+
+    @Query(
+            value = "SELECT i FROM Inventory i "
+                    + "JOIN i.warehouse w "
+                    + "LEFT JOIN i.createdBy cb "
+                    + "WHERE i.company.id = :companyId AND i.isDeleted = false "
+                    + "AND (:filterWarehouseId IS NULL OR w.id = :filterWarehouseId) "
+                    + "AND (:filterStatus IS NULL OR i.status = :filterStatus) "
+                    + "AND (:restrictWarehouses = false OR w.id IN :warehouseIds)",
+            countQuery = "SELECT COUNT(i) FROM Inventory i "
+                    + "JOIN i.warehouse w "
+                    + "WHERE i.company.id = :companyId AND i.isDeleted = false "
+                    + "AND (:filterWarehouseId IS NULL OR w.id = :filterWarehouseId) "
+                    + "AND (:filterStatus IS NULL OR i.status = :filterStatus) "
+                    + "AND (:restrictWarehouses = false OR w.id IN :warehouseIds)"
+    )
+    Page<Inventory> findPagedByCompany(
+            @Param("companyId") Long companyId,
+            @Param("filterWarehouseId") Long filterWarehouseId,
+            @Param("filterStatus") String filterStatus,
+            @Param("restrictWarehouses") boolean restrictWarehouses,
+            @Param("warehouseIds") List<Long> warehouseIds,
+            Pageable pageable);
 }

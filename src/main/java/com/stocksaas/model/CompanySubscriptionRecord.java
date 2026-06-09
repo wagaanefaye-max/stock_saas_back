@@ -53,6 +53,14 @@ public class CompanySubscriptionRecord extends BaseEntity {
     @Column(name = "proof_file_path", length = 500)
     private String proofFilePath;
 
+    /** Copie binaire du justificatif (persistant même si le fichier disque est perdu). */
+    @Lob
+    @Column(name = "proof_file_data")
+    private byte[] proofFileData;
+
+    @Column(name = "proof_content_type", length = 100)
+    private String proofContentType;
+
     /** Renseigné à la validation admin (null si PENDING). */
     @Column(name = "period_start", nullable = true)
     private LocalDateTime periodStart;

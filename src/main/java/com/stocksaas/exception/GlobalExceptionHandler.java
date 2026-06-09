@@ -1,6 +1,7 @@
 package com.stocksaas.exception;
 
 import com.stocksaas.exception.ForbiddenAccessException;
+import com.stocksaas.exception.ProofNotFoundException;
 import com.stocksaas.exception.SubscriptionReadOnlyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -63,6 +64,14 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
     }
 
+    @ExceptionHandler(ProofNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleProofNotFound(ProofNotFoundException ex) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("message", ex.getMessage());
+        response.put("error", "ProofNotFound");
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    }
+
     /**
      * Gère les exceptions RuntimeException
      */
@@ -70,6 +79,9 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleRuntimeException(RuntimeException ex) {
         if (ex instanceof ForbiddenAccessException forbidden) {
             return handleForbiddenAccess(forbidden);
+        }
+        if (ex instanceof ProofNotFoundException proofNotFound) {
+            return handleProofNotFound(proofNotFound);
         }
         Map<String, Object> response = new HashMap<>();
         response.put("message", ex.getMessage());

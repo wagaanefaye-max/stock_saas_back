@@ -2,6 +2,7 @@ package com.stocksaas.controller;
 
 import com.stocksaas.dto.CreateInventoryRequest;
 import com.stocksaas.dto.InventoryDTO;
+import com.stocksaas.dto.PageResponse;
 import com.stocksaas.dto.UpdateInventoryLinesRequest;
 import com.stocksaas.model.User;
 import com.stocksaas.repository.UserRepository;
@@ -44,10 +45,12 @@ public class InventoryController {
     private final UserWarehouseRepository userWarehouseRepository;
 
     @GetMapping
-    @Operation(summary = "Liste des inventaires", description = "Récupère les inventaires de l'entreprise (filtrés par entrepôts si gestionnaire). Filtres optionnels : warehouseId, status.")
-    public ResponseEntity<List<InventoryDTO>> getAll(
+    @Operation(summary = "Liste des inventaires", description = "Récupère les inventaires de l'entreprise avec pagination. Filtres optionnels : warehouseId, status.")
+    public ResponseEntity<PageResponse<InventoryDTO>> getAll(
             @RequestParam(required = false) Long warehouseId,
-            @RequestParam(required = false) String status) {
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
         try {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
             if (auth == null || auth.getName() == null) {
@@ -55,7 +58,7 @@ public class InventoryController {
             }
             User user = userRepository.findByEmailWithCompanyAndRole(auth.getName()).orElse(null);
             if (user == null || user.getCompany() == null) {
-                return ResponseEntity.ok(List.of());
+                return ResponseEntity.ok(emptyPage(page, size));
             }
             Long companyId = user.getCompany().getId();
             List<Long> warehouseIds = null;
@@ -65,13 +68,29 @@ public class InventoryController {
                         .filter(uw -> uw.getWarehouse() != null && uw.getWarehouse().getId() != null)
                         .map(uw -> uw.getWarehouse().getId())
                         .collect(Collectors.toList());
+                if (warehouseIds.isEmpty()) {
+                    return ResponseEntity.ok(emptyPage(page, size));
+                }
             }
-            List<InventoryDTO> list = inventoryService.listByCompany(companyId, warehouseIds, warehouseId, status);
-            return ResponseEntity.ok(list);
+            PageResponse<InventoryDTO> response = inventoryService.listByCompanyPaged(
+                    companyId, warehouseIds, warehouseId, status, page, size);
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
             log.error("Erreur liste inventaires", e);
-            return ResponseEntity.ok(List.of());
+            return ResponseEntity.ok(emptyPage(page, size));
         }
+    }
+
+    private static PageResponse<InventoryDTO> emptyPage(int page, int size) {
+        return PageResponse.<InventoryDTO>builder()
+                .content(List.of())
+                .page(page)
+                .size(size)
+                .totalElements(0)
+                .totalPages(0)
+                .first(true)
+                .last(true)
+                .build();
     }
 
     @GetMapping("/{id}")

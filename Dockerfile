@@ -13,6 +13,9 @@ WORKDIR /app
 
 COPY --from=build /app/target/*.jar app.jar
 
+RUN mkdir -p /data/uploads/subscriptions
+VOLUME ["/data/uploads/subscriptions"]
+
 EXPOSE 8080
 
 ENV PORT=8080

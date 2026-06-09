@@ -123,24 +123,16 @@ public class SubscriptionController {
     }
 
     @GetMapping("/requests/{id}/proof")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Justificatif de paiement", description = "Capture Wave ou Orange Money")
     public ResponseEntity<Resource> getProof(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails userDetails) throws Exception {
-        Resource resource = subscriptionService.getProofResource(id, userDetails.getUsername());
-        String contentType = MediaType.IMAGE_JPEG_VALUE;
-        String filename = resource.getFilename();
-        if (filename != null) {
-            if (filename.endsWith(".png")) {
-                contentType = MediaType.IMAGE_PNG_VALUE;
-            } else if (filename.endsWith(".webp")) {
-                contentType = "image/webp";
-            }
-        }
+        var proof = subscriptionService.getProofResource(id, userDetails.getUsername());
         return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(contentType))
+                .contentType(MediaType.parseMediaType(proof.contentType()))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"justificatif\"")
-                .body(resource);
+                .body(proof.resource());
     }
 
     @GetMapping("/quote")

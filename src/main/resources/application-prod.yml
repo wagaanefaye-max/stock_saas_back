@@ -65,3 +65,5 @@ springdoc:
 # URL de base de l'API (pour les liens de téléchargement de facture envoyés par email)
 app:
   base-url: https://sen-stocksaas.com
+  upload:
+    subscriptions-dir: ${APP_UPLOAD_SUBSCRIPTIONS_DIR:/data/uploads/subscriptions}

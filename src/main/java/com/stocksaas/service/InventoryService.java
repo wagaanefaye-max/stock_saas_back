@@ -5,11 +5,16 @@ import com.stocksaas.model.*;
 import com.stocksaas.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -86,29 +91,50 @@ public class InventoryService {
     }
 
     @Transactional(readOnly = true)
-    public List<InventoryDTO> listByCompany(Long companyId, List<Long> warehouseIds, Long filterWarehouseId, String filterStatus) {
-        List<Inventory> list;
-        if (warehouseIds != null && !warehouseIds.isEmpty()) {
-            list = inventoryRepository.findByCompanyIdAndWarehouseIdsAndNotDeleted(companyId, warehouseIds);
-        } else {
-            list = inventoryRepository.findByCompanyIdAndNotDeleted(companyId);
-        }
-        if (filterWarehouseId != null) {
-            list = list.stream()
-                    .filter(inv -> inv.getWarehouse() != null && filterWarehouseId.equals(inv.getWarehouse().getId()))
-                    .collect(Collectors.toList());
-        }
-        if (filterStatus != null && !filterStatus.isEmpty() && !"ALL".equalsIgnoreCase(filterStatus)) {
-            list = list.stream()
-                    .filter(inv -> filterStatus.equals(inv.getStatus()))
-                    .collect(Collectors.toList());
-        }
-        return list.stream()
-                .map(inv -> {
-                    List<InventoryLine> lines = inventoryLineRepository.findByInventoryIdWithProduct(inv.getId());
-                    return mapToDTO(inv, lines);
-                })
+    public PageResponse<InventoryDTO> listByCompanyPaged(
+            Long companyId,
+            List<Long> warehouseIds,
+            Long filterWarehouseId,
+            String filterStatus,
+            int page,
+            int size) {
+        boolean restrictWarehouses = warehouseIds != null && !warehouseIds.isEmpty();
+        List<Long> scopedWarehouseIds = restrictWarehouses ? warehouseIds : List.of(-1L);
+        String statusFilter = normalizeStatusFilter(filterStatus);
+
+        Pageable pageable = PageRequest.of(
+                page,
+                size,
+                Sort.by(Sort.Direction.DESC, "inventoryDate").and(Sort.by(Sort.Direction.DESC, "id")));
+
+        Page<Inventory> inventoryPage = inventoryRepository.findPagedByCompany(
+                companyId,
+                filterWarehouseId,
+                statusFilter,
+                restrictWarehouses,
+                scopedWarehouseIds,
+                pageable);
+
+        List<InventoryDTO> content = inventoryPage.getContent().stream()
+                .map(this::mapToSummaryDTO)
                 .collect(Collectors.toList());
+
+        return PageResponse.<InventoryDTO>builder()
+                .content(content)
+                .page(inventoryPage.getNumber())
+                .size(inventoryPage.getSize())
+                .totalElements(inventoryPage.getTotalElements())
+                .totalPages(inventoryPage.getTotalPages())
+                .first(inventoryPage.isFirst())
+                .last(inventoryPage.isLast())
+                .build();
+    }
+
+    private static String normalizeStatusFilter(String filterStatus) {
+        if (filterStatus == null || filterStatus.isBlank() || "ALL".equalsIgnoreCase(filterStatus)) {
+            return null;
+        }
+        return filterStatus;
     }
 
     @Transactional
@@ -177,6 +203,24 @@ public class InventoryService {
             case "CLOSED" -> "Clôturé";
             default -> status;
         };
+    }
+
+    private InventoryDTO mapToSummaryDTO(Inventory i) {
+        return InventoryDTO.builder()
+                .id(i.getId())
+                .warehouseId(i.getWarehouse().getId())
+                .warehouseName(i.getWarehouse().getName())
+                .inventoryDate(i.getInventoryDate())
+                .status(i.getStatus())
+                .statusLabel(statusToLabel(i.getStatus()))
+                .createdById(i.getCreatedBy() != null ? i.getCreatedBy().getId() : null)
+                .createdByName(i.getCreatedBy() != null ? i.getCreatedBy().getName() : null)
+                .closedAt(i.getClosedAt())
+                .notes(i.getNotes())
+                .createdAt(i.getCreatedAt())
+                .updatedAt(i.getUpdatedAt())
+                .lines(Collections.emptyList())
+                .build();
     }
 
     private InventoryDTO mapToDTO(Inventory i, List<InventoryLine> lines) {
