@@ -3,6 +3,7 @@ package com.stocksaas.service;
 import com.stocksaas.exception.ForbiddenAccessException;
 import com.stocksaas.dto.CreateWarehouseRequest;
 import com.stocksaas.dto.ProductInWarehouseDTO;
+import com.stocksaas.dto.UpdateStockThresholdRequest;
 import com.stocksaas.dto.UpdateWarehouseRequest;
 import com.stocksaas.dto.WarehouseDTO;
 import com.stocksaas.dto.WarehouseDTOForCreatingProduct;
@@ -152,6 +153,7 @@ public class WarehouseService {
                         .price(sl.getProduct().getPrice() != null ? sl.getProduct().getPrice() : BigDecimal.ZERO)
                         .quantity(sl.getQuantity() != null ? sl.getQuantity() : BigDecimal.ZERO)
                         .minThreshold(sl.getMinThreshold())
+                        .lowStock(ProductService.isLowStock(sl))
                         .build();
                 })
                 .collect(Collectors.toList());
@@ -206,6 +208,52 @@ public class WarehouseService {
         return mapToDTO(warehouseRepository.save(warehouse));
     }
     
+    /**
+     * Met à jour le seuil minimum d'un produit dans un entrepôt.
+     */
+    @Transactional
+    public ProductInWarehouseDTO updateProductMinThreshold(
+            Long companyId, Long warehouseId, Long productId, UpdateStockThresholdRequest request) {
+        Warehouse warehouse = warehouseRepository.findById(warehouseId)
+                .orElseThrow(() -> new RuntimeException("Entrepôt non trouvé avec l'ID: " + warehouseId));
+        if (warehouse.getIsDeleted()) {
+            throw new RuntimeException("L'entrepôt a été supprimé");
+        }
+        assertBelongsToCompany(warehouse, companyId);
+
+        StockLevel stockLevel = stockLevelRepository.findByProductIdAndWarehouseId(productId, warehouseId)
+                .orElseThrow(() -> new RuntimeException("Produit non trouvé dans cet entrepôt"));
+
+        if (stockLevel.getProduct() == null
+                || stockLevel.getProduct().getIsDeleted()
+                || stockLevel.getProduct().getCompany() == null
+                || !companyId.equals(stockLevel.getProduct().getCompany().getId())) {
+            throw new ForbiddenAccessException("Accès non autorisé à ce produit");
+        }
+
+        stockLevel.setMinThreshold(request.getMinThreshold());
+        stockLevelRepository.save(stockLevel);
+
+        var p = stockLevel.getProduct();
+        String ref = p.getReference();
+        if (ref == null && p.getId() != null && p.getCreatedAt() != null) {
+            ref = p.getSku() != null
+                    ? ProductReferenceUtil.buildReference(p.getCreatedAt().toLocalDate(), p.getSku(), p.getId())
+                    : ProductReferenceUtil.buildFallbackReference(p.getCreatedAt().toLocalDate(), p.getId());
+        }
+        return ProductInWarehouseDTO.builder()
+                .productId(p.getId())
+                .productReference(ref)
+                .productName(p.getName())
+                .sku(p.getSku())
+                .category(p.getProductCategory() != null ? p.getProductCategory().getLabel() : null)
+                .price(p.getPrice() != null ? p.getPrice() : BigDecimal.ZERO)
+                .quantity(stockLevel.getQuantity() != null ? stockLevel.getQuantity() : BigDecimal.ZERO)
+                .minThreshold(stockLevel.getMinThreshold())
+                .lowStock(ProductService.isLowStock(stockLevel))
+                .build();
+    }
+
     /**
      * Supprime logiquement un entrepôt (soft delete)
      */

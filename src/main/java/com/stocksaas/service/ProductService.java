@@ -104,15 +104,14 @@ public class ProductService {
         // Entrepôt par défaut : créé à l'inscription (nom \"DEFAULT-ENTREPOT\") ou premier entrepôt actif
         List<Warehouse> companyWarehouses = warehouseRepository.findByCompanyIdAndNotDeleted(companyId);
         if (!companyWarehouses.isEmpty()) {
-            Warehouse warehouse = companyWarehouses.stream()
-                    .filter(w -> "DEFAULT-ENTREPOT".equalsIgnoreCase(w.getName()))
-                    .findFirst()
-                    .orElse(companyWarehouses.get(0));
+            Warehouse warehouse = resolveTargetWarehouse(companyId, request.getWarehouseId(), companyWarehouses);
+            BigDecimal minThreshold = request.getMinThreshold() != null && request.getMinThreshold().compareTo(BigDecimal.ZERO) >= 0
+                    ? request.getMinThreshold() : BigDecimal.ZERO;
             StockLevel stockLevel = new StockLevel();
             stockLevel.setProduct(savedProduct);
             stockLevel.setWarehouse(warehouse);
             stockLevel.setQuantity(initialQty);
-            stockLevel.setMinThreshold(BigDecimal.ZERO);
+            stockLevel.setMinThreshold(minThreshold);
             stockLevelRepository.save(stockLevel);
             // Statut "En stock" si quantité > 0
             if (initialQty.compareTo(BigDecimal.ZERO) > 0) {
@@ -322,32 +321,11 @@ public class ProductService {
         BigDecimal quantityToUpdate = request.getQuantity() != null ? request.getQuantity() : request.getStock();
         
         if (quantityToUpdate != null) {
-            Warehouse warehouse = null;
-            
-            // Si un entrepôt est spécifié, l'utiliser
-            if (request.getWarehouseId() != null) {
-                warehouse = warehouseRepository.findById(request.getWarehouseId())
-                        .orElseThrow(() -> new RuntimeException("Entrepôt non trouvé avec l'ID: " + request.getWarehouseId()));
-                
-                if (!warehouse.getCompany().getId().equals(product.getCompany().getId())) {
-                    throw new RuntimeException("L'entrepôt n'appartient pas à la même entreprise");
-                }
-            } else {
-                // Sinon, utiliser le premier entrepôt actif de l'entreprise
-                List<Warehouse> warehouses = warehouseRepository.findAll().stream()
-                        .filter(w -> w.getCompany() != null && w.getCompany().getId().equals(product.getCompany().getId()))
-                        .filter(w -> !w.getIsDeleted())
-                        .filter(w -> w.getStatus() != null && "Actif".equals(w.getStatus().getCode()))
-                        .collect(Collectors.toList());
-                
-                if (!warehouses.isEmpty()) {
-                    warehouse = warehouses.get(0);
-                } else {
-                    throw new RuntimeException("Aucun entrepôt actif trouvé pour cette entreprise");
-                }
-            }
-            
-            // Mettre à jour le statut basé sur la quantité
+            Warehouse warehouse = resolveTargetWarehouse(
+                    product.getCompany().getId(),
+                    request.getWarehouseId(),
+                    warehouseRepository.findByCompanyIdAndNotDeleted(product.getCompany().getId()));
+
             String statusCode = quantityToUpdate.compareTo(BigDecimal.ZERO) > 0 ? "En stock" : "Rupture";
             ProductStatus status = productStatusRepository.findById(statusCode)
                     .orElseGet(() -> {
@@ -358,8 +336,7 @@ public class ProductService {
                         return productStatusRepository.save(newStatus);
                     });
             product.setStatus(status);
-            
-            // Mettre à jour le niveau de stock pour l'entrepôt (variable final pour le lambda)
+
             final Warehouse targetWarehouse = warehouse;
             StockLevel stockLevel = stockLevelRepository.findByProductIdAndWarehouseId(product.getId(), targetWarehouse.getId())
                     .orElseGet(() -> {
@@ -370,9 +347,31 @@ public class ProductService {
                         return newStockLevel;
                     });
             stockLevel.setQuantity(quantityToUpdate);
+            if (request.getMinThreshold() != null) {
+                stockLevel.setMinThreshold(request.getMinThreshold());
+            }
+            stockLevelRepository.save(stockLevel);
+        } else if (request.getMinThreshold() != null) {
+            List<Warehouse> companyWarehouses = warehouseRepository.findByCompanyIdAndNotDeleted(product.getCompany().getId());
+            if (companyWarehouses.isEmpty()) {
+                throw new RuntimeException("Aucun entrepôt trouvé pour cette entreprise");
+            }
+            Warehouse warehouse = resolveTargetWarehouse(
+                    product.getCompany().getId(),
+                    request.getWarehouseId(),
+                    companyWarehouses);
+            StockLevel stockLevel = stockLevelRepository.findByProductIdAndWarehouseId(product.getId(), warehouse.getId())
+                    .orElseGet(() -> {
+                        StockLevel newStockLevel = new StockLevel();
+                        newStockLevel.setProduct(product);
+                        newStockLevel.setWarehouse(warehouse);
+                        newStockLevel.setQuantity(BigDecimal.ZERO);
+                        return newStockLevel;
+                    });
+            stockLevel.setMinThreshold(request.getMinThreshold());
             stockLevelRepository.save(stockLevel);
         }
-        
+
         return mapToDTO(productRepository.save(product));
     }
     
@@ -402,19 +401,55 @@ public class ProductService {
     /**
      * Mappe un Product vers un ProductDTO
      */
+    private Warehouse resolveTargetWarehouse(Long companyId, Long warehouseId, List<Warehouse> companyWarehouses) {
+        if (companyWarehouses == null || companyWarehouses.isEmpty()) {
+            throw new RuntimeException("Aucun entrepôt trouvé pour cette entreprise");
+        }
+        if (warehouseId != null) {
+            Warehouse warehouse = warehouseRepository.findById(warehouseId)
+                    .orElseThrow(() -> new RuntimeException("Entrepôt non trouvé avec l'ID: " + warehouseId));
+            if (warehouse.getCompany() == null || !companyId.equals(warehouse.getCompany().getId())) {
+                throw new RuntimeException("L'entrepôt n'appartient pas à la même entreprise");
+            }
+            return warehouse;
+        }
+        return companyWarehouses.stream()
+                .filter(w -> "DEFAULT-ENTREPOT".equalsIgnoreCase(w.getName()))
+                .findFirst()
+                .orElse(companyWarehouses.get(0));
+    }
+
+    static boolean isLowStock(StockLevel stockLevel) {
+        if (stockLevel == null) {
+            return false;
+        }
+        BigDecimal min = stockLevel.getMinThreshold() != null ? stockLevel.getMinThreshold() : BigDecimal.ZERO;
+        BigDecimal qty = stockLevel.getQuantity() != null ? stockLevel.getQuantity() : BigDecimal.ZERO;
+        return min.compareTo(BigDecimal.ZERO) > 0 && qty.compareTo(min) <= 0;
+    }
+
     private ProductDTO mapToDTO(Product product) {
-        // Calculer le stock total et récupérer le premier entrepôt (pour affichage en édition)
         BigDecimal totalStock = BigDecimal.ZERO;
         Long warehouseId = null;
         String warehouseName = null;
+        BigDecimal minThreshold = BigDecimal.ZERO;
+        boolean lowStock = false;
         if (product.getStockLevels() != null && !product.getStockLevels().isEmpty()) {
             totalStock = product.getStockLevels().stream()
                     .map(StockLevel::getQuantity)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
+            for (StockLevel level : product.getStockLevels()) {
+                if (isLowStock(level)) {
+                    lowStock = true;
+                }
+            }
             StockLevel first = product.getStockLevels().iterator().next();
             if (first.getWarehouse() != null) {
                 warehouseId = first.getWarehouse().getId();
                 warehouseName = first.getWarehouse().getName();
+            }
+            if (first.getMinThreshold() != null) {
+                minThreshold = first.getMinThreshold();
             }
         }
         
@@ -443,6 +478,8 @@ public class ProductService {
                 .warehouseId(warehouseId)
                 .warehouseName(warehouseName)
                 .stock(totalStock)
+                .minThreshold(minThreshold)
+                .lowStock(lowStock)
                 .createdAt(product.getCreatedAt())
                 .updatedAt(product.getUpdatedAt())
                 .build();

@@ -26,4 +26,6 @@ public class ProductInWarehouseDTO {
     /** Quantité de ce produit dans l'entrepôt */
     private BigDecimal quantity;
     private BigDecimal minThreshold;
+    /** Vrai si seuil min > 0 et quantité ≤ seuil */
+    private Boolean lowStock;
 }

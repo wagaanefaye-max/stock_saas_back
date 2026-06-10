@@ -36,6 +36,7 @@ public class DashboardService {
     private final CompanyRepository companyRepository;
     private final UserRepository userRepository;
     private final UserWarehouseRepository userWarehouseRepository;
+    private final StockLevelRepository stockLevelRepository;
     
     /**
      * Récupère les statistiques du dashboard pour un utilisateur
@@ -74,8 +75,11 @@ public class DashboardService {
                     companyId, startOfMonth, endOfMonth);
         }
         
-        // Pour l'instant, on met 0 pour les alertes (à implémenter plus tard)
-        Long alerts = 0L;
+        boolean restrictWarehouses = warehouseIds != null && !warehouseIds.isEmpty();
+        long alerts = stockLevelRepository.countLowStockByCompany(
+                companyId,
+                restrictWarehouses,
+                restrictWarehouses ? warehouseIds : List.of(0L));
         
         // Compter les utilisateurs actifs de l'entreprise
         Long activeUsers = userRepository.countActiveUsersByCompanyId(companyId);

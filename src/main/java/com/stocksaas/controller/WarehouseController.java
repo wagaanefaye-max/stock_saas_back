@@ -2,6 +2,7 @@ package com.stocksaas.controller;
 
 import com.stocksaas.dto.CreateWarehouseRequest;
 import com.stocksaas.dto.ProductInWarehouseDTO;
+import com.stocksaas.dto.UpdateStockThresholdRequest;
 import com.stocksaas.dto.UpdateWarehouseRequest;
 import com.stocksaas.dto.WarehouseDTO;
 import com.stocksaas.dto.WarehouseDTOForCreatingProduct;
@@ -215,6 +216,27 @@ public class WarehouseController {
         }
     }
     
+    @PutMapping("/{warehouseId}/products/{productId}/threshold")
+    @Operation(summary = "Seuil minimum produit", description = "Met à jour le seuil minimum d'un produit dans un entrepôt")
+    public ResponseEntity<?> updateProductMinThreshold(
+            @PathVariable Long warehouseId,
+            @PathVariable Long productId,
+            @Valid @RequestBody UpdateStockThresholdRequest request) {
+        try {
+            User user = securityAccessService.requireAdminEntreprise();
+            Long companyId = securityAccessService.requireCompanyId(user);
+            securityAccessService.assertWarehouseAccessible(user, warehouseId);
+            ProductInWarehouseDTO updated = warehouseService.updateProductMinThreshold(
+                    companyId, warehouseId, productId, request);
+            return ResponseEntity.ok(updated);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (Exception e) {
+            log.error("Erreur lors de la mise à jour du seuil minimum", e);
+            return ResponseEntity.status(500).body(Map.of("message", "Une erreur est survenue"));
+        }
+    }
+
     @PutMapping("/{id}")
     @Operation(summary = "Mettre à jour un entrepôt", description = "Met à jour les informations d'un entrepôt existant")
     public ResponseEntity<?> updateWarehouse(@PathVariable Long id, @Valid @RequestBody UpdateWarehouseRequest request) {

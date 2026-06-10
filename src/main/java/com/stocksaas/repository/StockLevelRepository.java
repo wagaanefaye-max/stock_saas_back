@@ -32,4 +32,38 @@ public interface StockLevelRepository extends JpaRepository<StockLevel, Long> {
      */
     @Query("SELECT sl FROM StockLevel sl JOIN FETCH sl.warehouse w WHERE sl.product.id = :productId")
     List<StockLevel> findByProductIdWithWarehouse(@Param("productId") Long productId);
+
+    /**
+     * Nombre d'alertes stock bas : seuil min &gt; 0 et quantité ≤ seuil.
+     */
+    @Query("""
+            SELECT COUNT(sl) FROM StockLevel sl
+            JOIN sl.product p
+            JOIN sl.warehouse w
+            WHERE p.company.id = :companyId
+            AND p.isDeleted = false
+            AND w.isDeleted = false
+            AND sl.minThreshold > 0
+            AND sl.quantity <= sl.minThreshold
+            AND (:restrictWarehouses = false OR w.id IN :warehouseIds)
+            """)
+    long countLowStockByCompany(
+            @Param("companyId") Long companyId,
+            @Param("restrictWarehouses") boolean restrictWarehouses,
+            @Param("warehouseIds") List<Long> warehouseIds);
+
+    /**
+     * Nombre de produits distincts en stock bas pour une entreprise.
+     */
+    @Query("""
+            SELECT COUNT(DISTINCT p.id) FROM StockLevel sl
+            JOIN sl.product p
+            JOIN sl.warehouse w
+            WHERE p.company.id = :companyId
+            AND p.isDeleted = false
+            AND w.isDeleted = false
+            AND sl.minThreshold > 0
+            AND sl.quantity <= sl.minThreshold
+            """)
+    long countDistinctLowStockProductsByCompany(@Param("companyId") Long companyId);
 }

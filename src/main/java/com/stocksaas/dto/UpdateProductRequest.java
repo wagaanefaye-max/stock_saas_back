@@ -42,4 +42,7 @@ public class UpdateProductRequest {
     
     @Min(value = 0, message = "La quantité doit être positive ou nulle")
     private BigDecimal quantity;
+
+    @Min(value = 0, message = "Le seuil minimum doit être positif ou nul")
+    private BigDecimal minThreshold;
 }

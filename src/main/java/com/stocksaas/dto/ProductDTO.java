@@ -33,6 +33,10 @@ public class ProductDTO {
     private Long warehouseId;
     private String warehouseName;
     private BigDecimal stock;
+    /** Seuil minimum (entrepôt principal affiché) */
+    private BigDecimal minThreshold;
+    /** Vrai si au moins un entrepôt a quantité ≤ seuil min (> 0) */
+    private Boolean lowStock;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
