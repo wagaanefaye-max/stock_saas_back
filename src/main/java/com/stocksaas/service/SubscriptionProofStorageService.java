@@ -4,6 +4,8 @@ import com.stocksaas.dto.ProofResourceResult;
 import com.stocksaas.dto.StoredProofFile;
 import com.stocksaas.exception.ProofNotFoundException;
 import com.stocksaas.model.CompanySubscriptionRecord;
+import jakarta.annotation.PostConstruct;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
@@ -20,6 +22,7 @@ import java.util.Set;
 import java.util.UUID;
 
 @Service
+@Slf4j
 public class SubscriptionProofStorageService {
 
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
@@ -33,6 +36,13 @@ public class SubscriptionProofStorageService {
 
     @Value("${app.upload.subscriptions-dir:uploads/subscriptions}")
     private String subscriptionsDir;
+
+    @PostConstruct
+    void ensureStorageDirectory() throws IOException {
+        Path baseDir = Paths.get(subscriptionsDir).toAbsolutePath().normalize();
+        Files.createDirectories(baseDir);
+        log.info("Stockage des justificatifs de souscription : {}", baseDir);
+    }
 
     public StoredProofFile storeProof(MultipartFile file, Long companyId) throws IOException {
         if (file == null || file.isEmpty()) {

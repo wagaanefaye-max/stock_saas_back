@@ -66,4 +66,5 @@ springdoc:
 app:
   base-url: https://sen-stocksaas.com
   upload:
-    subscriptions-dir: ${APP_UPLOAD_SUBSCRIPTIONS_DIR:/data/uploads/subscriptions}
+    # Dossier persistant sur le serveur (survit aux redéploiements Docker)
+    subscriptions-dir: ${APP_UPLOAD_SUBSCRIPTIONS_DIR:/home/ubuntu/justificatifs}

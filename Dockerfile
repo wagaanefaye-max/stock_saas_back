@@ -13,8 +13,8 @@ WORKDIR /app
 
 COPY --from=build /app/target/*.jar app.jar
 
-RUN mkdir -p /data/uploads/subscriptions
-VOLUME ["/data/uploads/subscriptions"]
+# Monter le volume hôte : /home/ubuntu/justificatifs:/home/ubuntu/justificatifs
+ENV APP_UPLOAD_SUBSCRIPTIONS_DIR=/home/ubuntu/justificatifs
 
 EXPOSE 8080
 
