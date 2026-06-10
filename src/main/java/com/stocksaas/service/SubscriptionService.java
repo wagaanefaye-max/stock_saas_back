@@ -44,6 +44,8 @@ import java.util.Map;
 public class SubscriptionService {
 
     public static final int TRIAL_MONTHS = 1;
+    /** Plan payant unique — la tarification dépend uniquement de la durée. */
+    public static final String DEFAULT_PAID_PLAN_CODE = "Standard";
 
     private final CompanyRepository companyRepository;
     private final CompanySubscriptionRecordRepository subscriptionRecordRepository;
@@ -135,7 +137,7 @@ public class SubscriptionService {
         backfillSubscriptionIfMissing(companyId);
         syncSubscriptionStatus(companyId);
 
-        SubscriptionPlan plan = resolvePaidPlan(planCode);
+        SubscriptionPlan plan = resolvePaidPlan(planCode != null ? planCode : DEFAULT_PAID_PLAN_CODE);
         SubscriptionDuration duration = resolveDuration(durationCode);
 
         if (!PaymentProviderCode.isValid(paymentProvider)) {
@@ -292,10 +294,13 @@ public class SubscriptionService {
     }
 
     private SubscriptionPlan resolvePaidPlan(String planCode) {
-        if ("Free".equalsIgnoreCase(planCode)) {
-            throw new RuntimeException("Le plan gratuit ne nécessite pas de souscription. Choisissez un plan payant.");
+        String effectiveCode = (planCode == null || planCode.isBlank())
+                ? DEFAULT_PAID_PLAN_CODE
+                : planCode;
+        if ("Free".equalsIgnoreCase(effectiveCode)) {
+            throw new RuntimeException("Le plan gratuit ne nécessite pas de souscription.");
         }
-        SubscriptionPlan plan = subscriptionPlanRepository.findById(normalizePlanCode(planCode))
+        SubscriptionPlan plan = subscriptionPlanRepository.findById(normalizePlanCode(effectiveCode))
                 .orElseThrow(() -> new RuntimeException("Plan d'abonnement non trouvé: " + planCode));
         if (!Boolean.TRUE.equals(plan.getIsActive())) {
             throw new RuntimeException("Ce plan n'est plus disponible");
@@ -435,7 +440,7 @@ public class SubscriptionService {
     public List<SubscriptionPlanOptionDTO> listPaidPlans() {
         return subscriptionPlanRepository.findAll().stream()
                 .filter(p -> Boolean.TRUE.equals(p.getIsActive()))
-                .filter(p -> !"Free".equalsIgnoreCase(p.getCode()))
+                .filter(p -> DEFAULT_PAID_PLAN_CODE.equalsIgnoreCase(p.getCode()))
                 .map(p -> SubscriptionPlanOptionDTO.builder()
                         .code(p.getCode())
                         .label(p.getLabel())
@@ -460,10 +465,10 @@ public class SubscriptionService {
 
     @Transactional(readOnly = true)
     public Map<String, Object> buildQuote(String planCode, String durationCode, Long companyId) {
-        listPaidPlans().stream()
-                .filter(p -> p.getCode().equalsIgnoreCase(planCode))
-                .findFirst()
-                .orElseThrow(() -> new RuntimeException("Plan non trouvé"));
+        String effectivePlanCode = (planCode == null || planCode.isBlank())
+                ? DEFAULT_PAID_PLAN_CODE
+                : planCode;
+        resolvePaidPlan(effectivePlanCode);
         SubscriptionDuration duration = subscriptionDurationRepository.findById(durationCode)
                 .orElseThrow(() -> new RuntimeException("Durée non trouvée"));
         double discount = duration.getDiscountPercent() != null ? duration.getDiscountPercent() : 0.0;
@@ -485,7 +490,7 @@ public class SubscriptionService {
         LocalDateTime periodEnd = periodStart.plusMonths(duration.getMonths());
 
         java.util.HashMap<String, Object> quote = new java.util.HashMap<>();
-        quote.put("planCode", planCode);
+        quote.put("planCode", effectivePlanCode);
         quote.put("durationCode", duration.getCode());
         quote.put("months", duration.getMonths());
         quote.put("monthlyPrice", monthlyPrice);

@@ -153,7 +153,7 @@ public class MovementService {
             BigDecimal availableStock = stockLevel != null ? stockLevel.getQuantity() : BigDecimal.ZERO;
             
             if (availableStock.compareTo(request.getQuantity()) < 0) {
-                throw new RuntimeException("Stock insuffisant. Stock disponible: " + availableStock + ", Quantité demandée: " + request.getQuantity());
+                throw new RuntimeException("Stock insuffisant. Disponible : " + availableStock + ", demandé : " + request.getQuantity());
             }
         }
         

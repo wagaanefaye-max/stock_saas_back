@@ -1,5 +1,6 @@
 package com.stocksaas.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -14,7 +15,9 @@ import java.time.LocalDateTime;
 public class SubscriptionRecordDTO {
 
     private Long id;
+    @JsonIgnore
     private String planCode;
+    @JsonIgnore
     private String planLabel;
     private String durationCode;
     private String durationLabel;

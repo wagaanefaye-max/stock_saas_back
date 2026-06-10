@@ -13,6 +13,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 /**
  * DataSeeder pour initialiser les données de référence et un super admin au démarrage
  */
@@ -141,9 +143,9 @@ public class DataSeeder implements CommandLineRunner {
             plan.setMaxUsers(5);
             plan.setMaxWarehouses(2);
             plan.setTrialDays(null);
-            plan.setIsActive(true);
+            plan.setIsActive(false);
             subscriptionPlanRepository.save(plan);
-            log.debug("Plan d'abonnement 'Basique' créé");
+            log.debug("Plan d'abonnement 'Basique' créé (inactif)");
         }
         
         if (subscriptionPlanRepository.findById("Standard").isEmpty()) {
@@ -167,9 +169,24 @@ public class DataSeeder implements CommandLineRunner {
             plan.setMaxUsers(50);
             plan.setMaxWarehouses(10);
             plan.setTrialDays(null);
-            plan.setIsActive(true);
+            plan.setIsActive(false);
             subscriptionPlanRepository.save(plan);
-            log.debug("Plan d'abonnement 'Premium' créé");
+            log.debug("Plan d'abonnement 'Premium' créé (inactif)");
+        }
+
+        deactivateLegacyPaidPlans();
+    }
+
+    /** Un seul plan payant : Standard. Les anciens types (Basique, Premium) sont désactivés. */
+    private void deactivateLegacyPaidPlans() {
+        for (String legacyCode : List.of("Basique", "Premium")) {
+            subscriptionPlanRepository.findById(legacyCode).ifPresent(plan -> {
+                if (Boolean.TRUE.equals(plan.getIsActive())) {
+                    plan.setIsActive(false);
+                    subscriptionPlanRepository.save(plan);
+                    log.debug("Plan '{}' désactivé (abonnement par durée uniquement)", legacyCode);
+                }
+            });
         }
     }
     

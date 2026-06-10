@@ -13,13 +13,13 @@ import lombok.NoArgsConstructor;
 @Builder
 public class PlatformSettingsDTO {
 
-    @NotNull
+    @NotNull(message = "Le montant mensuel est obligatoire")
     @DecimalMin(value = "0.0", inclusive = false, message = "Le montant mensuel doit être supérieur à 0")
     private Double subscriptionMonthlyPriceFcfa;
 
-    @NotNull
+    @NotNull(message = "Le mode maintenance est obligatoire")
     private Boolean maintenanceMode;
 
-    @NotNull
+    @NotNull(message = "L'option d'inscription est obligatoire")
     private Boolean allowNewRegistrations;
 }

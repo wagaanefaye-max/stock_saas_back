@@ -131,14 +131,8 @@ public class AuthService {
             throw new RuntimeException("Un compte existe déjà avec cet email");
         }
         
-        // Récupérer le plan d'abonnement sélectionné (ou "Free" par défaut)
-        String planCode = request.getPlanCode() != null ? request.getPlanCode() : "Free";
-        SubscriptionPlan plan = subscriptionPlanRepository.findById(planCode)
-                .orElseGet(() -> {
-                    // Si le plan n'existe pas, utiliser "Free" par défaut
-                    return subscriptionPlanRepository.findById("Free")
-                            .orElseThrow(() -> new RuntimeException("Plan d'abonnement 'Free' non trouvé. Veuillez exécuter le DataSeeder."));
-                });
+        SubscriptionPlan plan = subscriptionPlanRepository.findById("Free")
+                .orElseThrow(() -> new RuntimeException("Plan d'abonnement 'Free' non trouvé. Veuillez exécuter le DataSeeder."));
         
         // Créer l'entreprise
         Company company = new Company();
@@ -223,9 +217,7 @@ public class AuthService {
             throw new RuntimeException("Un compte existe déjà avec l'email administrateur indiqué");
         }
 
-        String planCodeRaw = request.getPlanCode() != null && !request.getPlanCode().isBlank() ? request.getPlanCode().trim() : "Free";
-        String planCode = normalizePlanCode(planCodeRaw);
-        SubscriptionPlan plan = subscriptionPlanRepository.findById(planCode)
+        SubscriptionPlan plan = subscriptionPlanRepository.findById("Free")
                 .orElseGet(() -> subscriptionPlanRepository.findById("Free")
                         .orElseThrow(() -> new RuntimeException("Plan d'abonnement 'Free' non trouvé. Veuillez exécuter le DataSeeder.")));
 

@@ -61,7 +61,7 @@ public class SubscriptionController {
     @PostMapping(value = "/request", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Demande de souscription", description = "Soumet une capture Wave ou Orange Money en attente de validation")
     public ResponseEntity<SubscriptionRecordDTO> submitRequest(
-            @RequestParam String planCode,
+            @RequestParam(required = false) String planCode,
             @RequestParam String durationCode,
             @RequestParam String paymentProvider,
             @RequestPart("proof") MultipartFile proof,
@@ -137,7 +137,7 @@ public class SubscriptionController {
 
     @GetMapping("/quote")
     public ResponseEntity<Map<String, Object>> quote(
-            @RequestParam String planCode,
+            @RequestParam(required = false) String planCode,
             @RequestParam String durationCode,
             @AuthenticationPrincipal UserDetails userDetails) {
         Long companyId = null;

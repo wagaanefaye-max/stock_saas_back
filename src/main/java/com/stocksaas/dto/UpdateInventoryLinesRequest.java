@@ -23,9 +23,9 @@ public class UpdateInventoryLinesRequest {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class LineUpdate {
-        @NotNull
+        @NotNull(message = "Le produit est obligatoire")
         private Long productId;
-        @NotNull
+        @NotNull(message = "La quantité comptée est obligatoire")
         private BigDecimal countedQuantity;
     }
 }

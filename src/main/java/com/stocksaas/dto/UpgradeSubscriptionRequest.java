@@ -6,7 +6,6 @@ import lombok.Data;
 @Data
 public class UpgradeSubscriptionRequest {
 
-    @NotBlank(message = "Le code plan est obligatoire")
     private String planCode;
 
     @NotBlank(message = "La durée d'abonnement est obligatoire")
