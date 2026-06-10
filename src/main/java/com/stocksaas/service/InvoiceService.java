@@ -128,9 +128,7 @@ public class InvoiceService {
             for (InvoiceLine line : invoice.getLines()) {
                 createStockExitForLine(companyId, userId, invoice.getInvoiceNumber(), invoice.getInvoiceDate(), line);
             }
-            // Générer un lien de téléchargement public (utilisé pour l'email et WhatsApp)
-            String token = invoiceDownloadTokenStore.generateToken(invoice.getId());
-            publicDownloadUrl = appBaseUrl.replaceAll("/$", "") + "/api/public/invoices/pdf?token=" + token;
+            publicDownloadUrl = buildPublicDownloadUrl(invoice.getId());
             String clientEmail = invoice.getClient().getEmail();
             String clientName = invoice.getClient().getName();
             emailService.sendInvoicePaidWithDownloadLink(clientEmail, clientName, invoice.getInvoiceNumber(), publicDownloadUrl);
@@ -258,7 +256,9 @@ public class InvoiceService {
         if (invoice.getIsDeleted() || !companyId.equals(invoice.getCompany().getId())) {
             throw new RuntimeException("Facture non trouvée");
         }
-        return mapToDTO(invoice);
+        InvoiceDTO dto = mapToDTO(invoice);
+        dto.setPublicDownloadUrl(buildPublicDownloadUrl(invoice.getId()));
+        return dto;
     }
 
     @Transactional
@@ -323,8 +323,7 @@ public class InvoiceService {
             for (InvoiceLine line : invoice.getLines()) {
                 createStockExitForLine(companyId, userId, invoice.getInvoiceNumber(), invoice.getInvoiceDate(), line);
             }
-            String token = invoiceDownloadTokenStore.generateToken(invoice.getId());
-            publicDownloadUrl = appBaseUrl.replaceAll("/$", "") + "/api/public/invoices/pdf?token=" + token;
+            publicDownloadUrl = buildPublicDownloadUrl(invoice.getId());
             String clientEmail = invoice.getClient().getEmail();
             String clientName = invoice.getClient().getName();
             emailService.sendInvoicePaidWithDownloadLink(clientEmail, clientName, invoice.getInvoiceNumber(), publicDownloadUrl);
@@ -379,6 +378,14 @@ public class InvoiceService {
                 .createdAt(i.getCreatedAt())
                 .updatedAt(i.getUpdatedAt())
                 .build();
+    }
+
+    /**
+     * Génère un lien public de téléchargement PDF (WhatsApp, email, partage).
+     */
+    private String buildPublicDownloadUrl(Long invoiceId) {
+        String token = invoiceDownloadTokenStore.generateToken(invoiceId);
+        return appBaseUrl.replaceAll("/$", "") + "/api/public/invoices/pdf?token=" + token;
     }
 
     private InvoiceLineDTO mapLineToDTO(InvoiceLine l) {
