@@ -3,10 +3,12 @@ package com.stocksaas.service;
 import com.stocksaas.dto.DashboardStatsDTO;
 import com.stocksaas.dto.SuperAdminDashboardStatsDTO;
 import com.stocksaas.model.Company;
+import com.stocksaas.model.CompanySubscriptionRecord;
 import com.stocksaas.model.Movement;
 import com.stocksaas.model.Product;
 import com.stocksaas.model.User;
 import com.stocksaas.model.Warehouse;
+import com.stocksaas.subscription.SubscriptionRequestStatusCode;
 import com.stocksaas.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,9 +19,13 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -37,6 +43,7 @@ public class DashboardService {
     private final UserRepository userRepository;
     private final UserWarehouseRepository userWarehouseRepository;
     private final StockLevelRepository stockLevelRepository;
+    private final CompanySubscriptionRecordRepository subscriptionRecordRepository;
     
     /**
      * Récupère les statistiques du dashboard pour un utilisateur
@@ -165,6 +172,13 @@ public class DashboardService {
         } catch (Exception e) {
             log.warn("Erreur lors de la récupération de la distribution des plans", e);
         }
+
+        List<SuperAdminDashboardStatsDTO.MonthlySubscriptionData> monthlySubscriptionsData = new ArrayList<>();
+        try {
+            monthlySubscriptionsData = getMonthlySubscriptionsData(sixMonthsAgo);
+        } catch (Exception e) {
+            log.warn("Erreur lors de la récupération des souscriptions mensuelles", e);
+        }
         
         // Récupérer les entreprises récentes
         List<Company> recentCompanies = new ArrayList<>();
@@ -189,6 +203,7 @@ public class DashboardService {
                 .monthlyRevenue(monthlyRevenue)
                 .supportTickets(supportTickets)
                 .monthlyCompaniesData(monthlyData)
+                .monthlySubscriptionsData(monthlySubscriptionsData)
                 .planDistribution(planData)
                 .recentCompanies(recentCompaniesDTO)
                 .companiesChange("+0")
@@ -370,6 +385,53 @@ public class DashboardService {
         }
     }
     
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+    private List<SuperAdminDashboardStatsDTO.MonthlySubscriptionData> getMonthlySubscriptionsData(LocalDateTime startDate) {
+        String[] monthNames = {"Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"};
+        LocalDateTime current = LocalDateTime.now();
+
+        Map<YearMonth, long[]> countsByMonth = new HashMap<>();
+        for (int i = 0; i < 6; i++) {
+            YearMonth ym = YearMonth.from(current.minusMonths(i));
+            countsByMonth.put(ym, new long[3]);
+        }
+
+        List<CompanySubscriptionRecord> records =
+                subscriptionRecordRepository.findByCreatedAtAfterAndIsDeletedFalse(startDate);
+        for (CompanySubscriptionRecord record : records) {
+            if (record.getCreatedAt() == null) {
+                continue;
+            }
+            YearMonth ym = YearMonth.from(record.getCreatedAt());
+            long[] counts = countsByMonth.get(ym);
+            if (counts == null) {
+                continue;
+            }
+            String status = record.getRequestStatus();
+            if (SubscriptionRequestStatusCode.APPROVED.equals(status)) {
+                counts[0]++;
+            } else if (SubscriptionRequestStatusCode.REJECTED.equals(status)) {
+                counts[1]++;
+            } else if (SubscriptionRequestStatusCode.PENDING.equals(status)) {
+                counts[2]++;
+            }
+        }
+
+        List<SuperAdminDashboardStatsDTO.MonthlySubscriptionData> dataList = new ArrayList<>();
+        for (int i = 5; i >= 0; i--) {
+            YearMonth ym = YearMonth.from(current.minusMonths(i));
+            long[] counts = countsByMonth.getOrDefault(ym, new long[3]);
+            String monthKey = monthNames[ym.getMonthValue() - 1];
+            dataList.add(SuperAdminDashboardStatsDTO.MonthlySubscriptionData.builder()
+                    .month(monthKey)
+                    .approvedCount(counts[0])
+                    .rejectedCount(counts[1])
+                    .pendingCount(counts[2])
+                    .build());
+        }
+        return dataList;
+    }
+
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     private List<SuperAdminDashboardStatsDTO.PlanDistributionData> getPlanDistributionData() {
         try {

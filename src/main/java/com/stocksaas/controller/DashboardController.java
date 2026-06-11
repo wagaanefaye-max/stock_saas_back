@@ -165,6 +165,7 @@ public class DashboardController {
                         .monthlyRevenue("0 FCFA")
                         .supportTickets(0L)
                         .monthlyCompaniesData(java.util.Collections.emptyList())
+                        .monthlySubscriptionsData(java.util.Collections.emptyList())
                         .planDistribution(java.util.Collections.emptyList())
                         .recentCompanies(java.util.Collections.emptyList())
                         .companiesChange("0")

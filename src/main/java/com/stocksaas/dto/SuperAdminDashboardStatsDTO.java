@@ -22,6 +22,7 @@ public class SuperAdminDashboardStatsDTO {
     
     // Données pour les graphiques
     private List<MonthlyCompanyData> monthlyCompaniesData;
+    private List<MonthlySubscriptionData> monthlySubscriptionsData;
     private List<PlanDistributionData> planDistribution;
     
     // Entreprises récentes
@@ -40,6 +41,17 @@ public class SuperAdminDashboardStatsDTO {
     public static class MonthlyCompanyData {
         private String month;
         private Long count;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class MonthlySubscriptionData {
+        private String month;
+        private Long approvedCount;
+        private Long rejectedCount;
+        private Long pendingCount;
     }
     
     @Data
