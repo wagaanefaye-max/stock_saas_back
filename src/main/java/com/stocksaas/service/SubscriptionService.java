@@ -20,6 +20,7 @@ import com.stocksaas.subscription.SubscriptionPricing;
 import com.stocksaas.subscription.SubscriptionRequestStatusCode;
 import com.stocksaas.subscription.SubscriptionStatusCode;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -41,6 +42,7 @@ import java.util.Map;
  */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class SubscriptionService {
 
     public static final int TRIAL_MONTHS = 1;
@@ -54,6 +56,8 @@ public class SubscriptionService {
     private final UserRepository userRepository;
     private final SubscriptionProofStorageService proofStorageService;
     private final PlatformSettingsService platformSettingsService;
+    private final SubscriptionInvoicePdfService subscriptionInvoicePdfService;
+    private final EmailService emailService;
 
     /**
      * Initialise l'essai gratuit d'un mois pour une nouvelle entreprise.
@@ -194,7 +198,39 @@ public class SubscriptionService {
         record.setRejectionReason(null);
         record = subscriptionRecordRepository.save(record);
 
+        sendSubscriptionApprovalInvoice(record, company);
+
         return toRecordDto(record, adminEmail);
+    }
+
+    private void sendSubscriptionApprovalInvoice(CompanySubscriptionRecord record, Company company) {
+        String toEmail = record.getSubscribedByEmail();
+        if (toEmail == null || toEmail.isBlank()) {
+            toEmail = company.getEmail();
+        }
+        if (toEmail == null || toEmail.isBlank()) {
+            log.warn("Aucun email pour envoyer la facture d'abonnement (record id={})", record.getId());
+            return;
+        }
+
+        String recipientName = userRepository.findByEmail(toEmail.trim())
+                .map(User::getName)
+                .orElse(company.getName());
+
+        try {
+            String invoiceNumber = SubscriptionInvoicePdfService.buildInvoiceNumber(record);
+            byte[] pdf = subscriptionInvoicePdfService.generatePdf(record, company, invoiceNumber);
+            emailService.sendSubscriptionApprovedWithInvoice(
+                    toEmail,
+                    recipientName,
+                    company.getName(),
+                    invoiceNumber,
+                    pdf
+            );
+        } catch (Exception e) {
+            log.error("Impossible d'envoyer la facture d'abonnement pour le record {}: {}",
+                    record.getId(), e.getMessage());
+        }
     }
 
     @Transactional

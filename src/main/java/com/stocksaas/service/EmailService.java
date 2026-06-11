@@ -1,10 +1,13 @@
 package com.stocksaas.service;
 
+import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -223,5 +226,56 @@ public class EmailService {
                "Ce lien est valable 30 jours.\n\n" +
                "Cordialement,\n" +
                "L'équipe Stock SaaS";
+    }
+
+    /**
+     * Envoie la facture d'abonnement en pièce jointe PDF après validation par le super admin.
+     */
+    public void sendSubscriptionApprovedWithInvoice(
+            String toEmail,
+            String recipientName,
+            String companyName,
+            String invoiceNumber,
+            byte[] pdfBytes
+    ) {
+        if (toEmail == null || toEmail.isBlank()) {
+            log.warn("Email souscripteur vide, envoi de la facture d'abonnement {} ignoré", invoiceNumber);
+            return;
+        }
+        if (pdfBytes == null || pdfBytes.length == 0) {
+            log.warn("PDF facture abonnement {} vide, envoi ignoré pour {}", invoiceNumber, toEmail);
+            return;
+        }
+        try {
+            MimeMessage mimeMessage = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
+            helper.setFrom(fromEmail);
+            helper.setTo(toEmail.trim());
+            helper.setSubject("Votre facture d'abonnement " + invoiceNumber + " - Stock SaaS");
+            helper.setText(buildSubscriptionApprovedEmailContent(recipientName, companyName, invoiceNumber), false);
+
+            String filename = "facture-abonnement-" + invoiceNumber + ".pdf";
+            helper.addAttachment(filename, new ByteArrayResource(pdfBytes), "application/pdf");
+
+            mailSender.send(mimeMessage);
+            log.info("Facture d'abonnement {} envoyée par email à {}", invoiceNumber, toEmail);
+        } catch (Exception e) {
+            log.error("Erreur lors de l'envoi de la facture d'abonnement {} à {}: {}",
+                    invoiceNumber, toEmail, e.getMessage());
+        }
+    }
+
+    private String buildSubscriptionApprovedEmailContent(
+            String recipientName,
+            String companyName,
+            String invoiceNumber
+    ) {
+        return "Bonjour " + (recipientName != null && !recipientName.isBlank() ? recipientName : "Administrateur") + ",\n\n"
+                + "Votre demande d'abonnement pour l'entreprise " + companyName + " a été validée.\n\n"
+                + "Vous trouverez en pièce jointe la facture " + invoiceNumber + " au format PDF.\n\n"
+                + "Votre abonnement est désormais actif. Vous pouvez vous connecter à Stock SaaS "
+                + "et profiter de toutes les fonctionnalités de gestion de stock.\n\n"
+                + "Cordialement,\n"
+                + "L'équipe Stock SaaS";
     }
 }
