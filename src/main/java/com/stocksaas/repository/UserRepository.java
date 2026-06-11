@@ -86,4 +86,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
            "AND u.isDeleted = false AND u.role.code = 'ADMIN_ENTREPRISE' " +
            "AND u.email IS NOT NULL")
     List<User> findCompanyAdminsByCompanyId(@Param("companyId") Long companyId);
+
+    @Query("SELECT u FROM User u JOIN FETCH u.role WHERE u.isDeleted = false " +
+           "AND u.role.code = 'SUPER_ADMIN' AND u.email IS NOT NULL")
+    List<User> findActiveSuperAdmins();
 }

@@ -147,6 +147,42 @@ public class EmailService {
     }
 
     /**
+     * Notifie un super admin qu'une nouvelle demande de souscription a été soumise.
+     */
+    public void notifySuperAdminNewSubscriptionRequest(
+            String superAdminEmail,
+            String superAdminName,
+            String companyName,
+            String requesterName,
+            String requesterEmail,
+            String planLabel,
+            String durationLabel,
+            double amountPaid,
+            String paymentProviderLabel,
+            Long requestId
+    ) {
+        if (isBlank(superAdminEmail)) {
+            return;
+        }
+        emailOutboxService.enqueueTextEmail(
+                superAdminEmail.trim(),
+                "Nouvelle demande de souscription — " + companyName + " - Stock SaaS",
+                buildSuperAdminNewSubscriptionContent(
+                        superAdminName,
+                        companyName,
+                        requesterName,
+                        requesterEmail,
+                        planLabel,
+                        durationLabel,
+                        amountPaid,
+                        paymentProviderLabel,
+                        requestId
+                ),
+                "SUBSCRIPTION_REQUEST_SUPER_ADMIN"
+        );
+    }
+
+    /**
      * Notifie le demandeur lorsqu'une souscription est refusée par le super admin.
      */
     public void sendSubscriptionRejected(
@@ -267,6 +303,44 @@ public class EmailService {
             base = base.substring(0, base.length() - 1);
         }
         return base + "/company-admin/subscriptions";
+    }
+
+    private String buildSuperAdminSubscriptionRequestsUrl() {
+        String base = appBaseUrl != null && !appBaseUrl.isBlank() ? appBaseUrl.trim() : "http://localhost:4200";
+        if (base.endsWith("/")) {
+            base = base.substring(0, base.length() - 1);
+        }
+        return base + "/super-admin/subscription-requests";
+    }
+
+    private String buildSuperAdminNewSubscriptionContent(
+            String superAdminName,
+            String companyName,
+            String requesterName,
+            String requesterEmail,
+            String planLabel,
+            String durationLabel,
+            double amountPaid,
+            String paymentProviderLabel,
+            Long requestId
+    ) {
+        String amountFormatted = String.format("%,.0f", amountPaid).replace(',', ' ');
+        String requester = (requesterName != null && !requesterName.isBlank() ? requesterName : "Utilisateur")
+                + (requesterEmail != null && !requesterEmail.isBlank() ? " (" + requesterEmail + ")" : "");
+
+        return "Bonjour " + (superAdminName != null && !superAdminName.isBlank() ? superAdminName : "Super administrateur") + ",\n\n"
+                + "Une nouvelle demande de souscription vient d'être soumise sur Stock SaaS.\n\n"
+                + "Entreprise : " + companyName + "\n"
+                + "Demandeur : " + requester + "\n"
+                + "Plan : " + (planLabel != null ? planLabel : "Standard") + "\n"
+                + "Durée : " + (durationLabel != null ? durationLabel : "") + "\n"
+                + "Montant : " + amountFormatted + " FCFA\n"
+                + "Paiement : " + (paymentProviderLabel != null ? paymentProviderLabel : "") + "\n"
+                + "Référence demande : #" + requestId + "\n\n"
+                + "Connectez-vous pour valider ou refuser la demande :\n\n"
+                + buildSuperAdminSubscriptionRequestsUrl() + "\n\n"
+                + "Cordialement,\n"
+                + "L'équipe Stock SaaS";
     }
 
     private String buildSubscriptionRejectedEmailContent(

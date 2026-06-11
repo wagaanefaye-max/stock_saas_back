@@ -169,7 +169,36 @@ public class SubscriptionService {
         record.setIsDeleted(false);
         record = subscriptionRecordRepository.save(record);
 
+        notifySuperAdminsOfNewSubscription(company, requester, record);
+
         return toRecordDto(record, requesterEmail);
+    }
+
+    private void notifySuperAdminsOfNewSubscription(
+            Company company,
+            User requester,
+            CompanySubscriptionRecord record
+    ) {
+        List<User> superAdmins = userRepository.findActiveSuperAdmins();
+        if (superAdmins.isEmpty()) {
+            log.warn("Aucun super admin actif pour notifier la souscription #{}", record.getId());
+            return;
+        }
+        String paymentLabel = PaymentProviderCode.label(record.getPaymentProvider());
+        for (User admin : superAdmins) {
+            emailService.notifySuperAdminNewSubscriptionRequest(
+                    admin.getEmail(),
+                    admin.getName(),
+                    company.getName(),
+                    requester.getName(),
+                    requester.getEmail(),
+                    record.getPlanLabel(),
+                    record.getDurationLabel(),
+                    record.getAmountPaid() != null ? record.getAmountPaid() : 0d,
+                    paymentLabel,
+                    record.getId()
+            );
+        }
     }
 
     @Transactional
