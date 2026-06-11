@@ -52,6 +52,14 @@ app:
       enabled: ${SUBSCRIPTION_REMINDERS_ENABLED:true}
       # Tous les jours à 08:00
       cron: ${SUBSCRIPTION_REMINDERS_CRON:0 0 8 * * *}
+  mail:
+    retry:
+      enabled: ${MAIL_RETRY_ENABLED:true}
+      # Relance toutes les 10 minutes
+      cron: ${MAIL_RETRY_CRON:0 */10 * * * *}
+      interval-minutes: ${MAIL_RETRY_INTERVAL_MINUTES:10}
+      max-attempts: ${MAIL_RETRY_MAX_ATTEMPTS:144}
+      batch-size: ${MAIL_RETRY_BATCH_SIZE:50}
 
 # Désactivation complète de JMX et RMI
 management:

@@ -1,153 +1,89 @@
 package com.stocksaas.service;
 
-import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ByteArrayResource;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 
 /**
- * Service pour l'envoi d'emails
+ * Service pour l'envoi d'emails (via file d'attente avec relance automatique).
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class EmailService {
-    
-    private final JavaMailSender mailSender;
-    
-    @Value("${spring.mail.username}")
-    private String fromEmail;
-    
+
+    private final EmailOutboxService emailOutboxService;
+
+    @Value("${app.base-url:http://localhost:4200}")
+    private String appBaseUrl;
+
     /**
      * Envoie un email de notification de connexion
      */
     public void sendLoginNotification(String toEmail, String userName) {
-        try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(fromEmail);
-            message.setTo(toEmail);
-            message.setSubject("Notification de connexion - Stock SaaS");
-            message.setText(buildLoginEmailContent(userName));
-            
-            mailSender.send(message);
-            log.info("Email de notification de connexion envoyé à: {}", toEmail);
-        } catch (Exception e) {
-            log.error("Erreur lors de l'envoi de l'email de notification de connexion à {}: {}", toEmail, e.getMessage());
-            // Ne pas faire échouer la connexion si l'email échoue
+        if (isBlank(toEmail)) {
+            return;
         }
+        emailOutboxService.enqueueTextEmail(
+                toEmail.trim(),
+                "Notification de connexion - Stock SaaS",
+                buildLoginEmailContent(userName),
+                "LOGIN_NOTIFICATION"
+        );
     }
-    
-    @Value("${app.base-url:http://localhost:4200}")
-    private String appBaseUrl;
 
     /**
      * Envoie un email avec lien de réinitialisation (définir le mot de passe, valide 2 jours)
      */
     public void sendAccountVerificationEmail(String toEmail, String userName, String companyName, String verificationToken) {
-        try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(fromEmail);
-            message.setTo(toEmail);
-            message.setSubject("Définissez votre mot de passe - Stock SaaS - " + companyName);
-            
-            String base = appBaseUrl != null && !appBaseUrl.isBlank() ? appBaseUrl.trim() : "http://localhost:4200";
-            if (base.endsWith("/")) {
-                base = base.substring(0, base.length() - 1);
-            }
-            String verificationUrl = base + "/verify-account?token=" + verificationToken;
-            message.setText(buildVerificationEmailContent(userName, companyName, verificationUrl));
-            
-            mailSender.send(message);
-            log.info("Email de validation de compte envoyé à: {}", toEmail);
-        } catch (Exception e) {
-            log.error("Erreur lors de l'envoi de l'email de validation à {}: {}", toEmail, e.getMessage());
-            // Ne pas faire échouer l'inscription si l'email échoue
+        if (isBlank(toEmail)) {
+            return;
         }
+        String base = appBaseUrl != null && !appBaseUrl.isBlank() ? appBaseUrl.trim() : "http://localhost:4200";
+        if (base.endsWith("/")) {
+            base = base.substring(0, base.length() - 1);
+        }
+        String verificationUrl = base + "/verify-account?token=" + verificationToken;
+        emailOutboxService.enqueueTextEmail(
+                toEmail.trim(),
+                "Définissez votre mot de passe - Stock SaaS - " + companyName,
+                buildVerificationEmailContent(userName, companyName, verificationUrl),
+                "ACCOUNT_VERIFICATION"
+        );
     }
-    
+
     /**
      * Envoie un email de confirmation d'activation de compte
      */
     public void sendAccountActivatedEmail(String toEmail, String userName) {
-        try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(fromEmail);
-            message.setTo(toEmail);
-            message.setSubject("Votre compte Stock SaaS est activé");
-            message.setText(buildAccountActivatedEmailContent(userName));
-            
-            mailSender.send(message);
-            log.info("Email de confirmation d'activation envoyé à: {}", toEmail);
-        } catch (Exception e) {
-            log.error("Erreur lors de l'envoi de l'email de confirmation à {}: {}", toEmail, e.getMessage());
+        if (isBlank(toEmail)) {
+            return;
         }
-    }
-    
-    /**
-     * Construit le contenu de l'email de notification de connexion
-     */
-    private String buildLoginEmailContent(String userName) {
-        return "Bonjour " + userName + ",\n\n" +
-               "Une connexion à votre compte Stock SaaS a été détectée.\n\n" +
-               "Si vous n'êtes pas à l'origine de cette connexion, veuillez contacter immédiatement le support.\n\n" +
-               "Cordialement,\n" +
-               "L'équipe Stock SaaS";
-    }
-    
-    /**
-     * Construit le contenu de l'email de validation de compte
-     */
-    private String buildVerificationEmailContent(String userName, String companyName, String verificationUrl) {
-        return "Bonjour " + userName + ",\n\n" +
-               "Bienvenue sur Stock SaaS !\n\n" +
-               "Votre compte a été créé pour l'entreprise : " + companyName + ".\n\n" +
-               "Pour activer votre compte, cliquez sur le lien ci-dessous pour définir votre mot de passe :\n\n" +
-               verificationUrl + "\n\n" +
-               "Ce lien de réinitialisation est valable 2 jours.\n\n" +
-               "Si vous n'avez pas créé de compte, veuillez ignorer cet email.\n\n" +
-               "Cordialement,\n" +
-               "L'équipe Stock SaaS";
-    }
-    
-    /**
-     * Construit le contenu de l'email de confirmation d'activation
-     */
-    private String buildAccountActivatedEmailContent(String userName) {
-        return "Bonjour " + userName + ",\n\n" +
-               "Votre compte Stock SaaS a été activé avec succès !\n\n" +
-               "Vous pouvez maintenant vous connecter à votre compte et commencer à gérer votre inventaire.\n\n" +
-               "Cordialement,\n" +
-               "L'équipe Stock SaaS";
+        emailOutboxService.enqueueTextEmail(
+                toEmail.trim(),
+                "Votre compte Stock SaaS est activé",
+                buildAccountActivatedEmailContent(userName),
+                "ACCOUNT_ACTIVATED"
+        );
     }
 
     /**
      * Envoie un email au client avec un lien pour télécharger la facture (facture marquée payée).
      */
     public void sendInvoicePaidWithDownloadLink(String toEmail, String clientName, String invoiceNumber, String downloadUrl) {
-        if (toEmail == null || toEmail.isBlank()) {
+        if (isBlank(toEmail)) {
             log.warn("Email client vide, envoi du lien de téléchargement de facture ignoré pour {}", invoiceNumber);
             return;
         }
-        try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(fromEmail);
-            message.setTo(toEmail.trim());
-            message.setSubject("Votre facture " + (invoiceNumber != null ? invoiceNumber : "") + " - Stock SaaS");
-            message.setText(buildInvoicePaidEmailContent(clientName, invoiceNumber, downloadUrl));
-
-            mailSender.send(message);
-            log.info("Email avec lien de téléchargement de facture envoyé à: {}", toEmail);
-        } catch (Exception e) {
-            log.error("Erreur lors de l'envoi de l'email avec lien de téléchargement à {}: {}", toEmail, e.getMessage());
-            // Ne pas faire échouer la création de la facture si l'email échoue
-        }
+        emailOutboxService.enqueueTextEmail(
+                toEmail.trim(),
+                "Votre facture " + (invoiceNumber != null ? invoiceNumber : "") + " - Stock SaaS",
+                buildInvoicePaidEmailContent(clientName, invoiceNumber, downloadUrl),
+                "INVOICE_PAID"
+        );
     }
 
     /**
@@ -162,27 +98,110 @@ public class EmailService {
             long daysBeforeEnd,
             String subscriptionsUrl
     ) {
-        if (toEmail == null || toEmail.isBlank()) {
+        if (isBlank(toEmail)) {
             return;
         }
-        try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(fromEmail);
-            message.setTo(toEmail.trim());
-            message.setSubject(buildSubscriptionReminderSubject(companyName, daysBeforeEnd));
-            message.setText(buildSubscriptionReminderContent(
-                    recipientName,
-                    companyName,
-                    subscriptionKindLabel,
-                    periodEndAt,
-                    daysBeforeEnd,
-                    subscriptionsUrl
-            ));
-            mailSender.send(message);
-            log.info("Rappel abonnement J-{} envoyé à {} pour {}", daysBeforeEnd, toEmail, companyName);
-        } catch (Exception e) {
-            log.error("Erreur envoi rappel abonnement à {}: {}", toEmail, e.getMessage());
+        emailOutboxService.enqueueTextEmail(
+                toEmail.trim(),
+                buildSubscriptionReminderSubject(companyName, daysBeforeEnd),
+                buildSubscriptionReminderContent(
+                        recipientName,
+                        companyName,
+                        subscriptionKindLabel,
+                        periodEndAt,
+                        daysBeforeEnd,
+                        subscriptionsUrl
+                ),
+                "SUBSCRIPTION_REMINDER"
+        );
+    }
+
+    /**
+     * Envoie la facture d'abonnement en pièce jointe PDF après validation par le super admin.
+     */
+    public void sendSubscriptionApprovedWithInvoice(
+            String toEmail,
+            String recipientName,
+            String companyName,
+            String invoiceNumber,
+            byte[] pdfBytes
+    ) {
+        if (isBlank(toEmail)) {
+            log.warn("Email souscripteur vide, envoi de la facture d'abonnement {} ignoré", invoiceNumber);
+            return;
         }
+        if (pdfBytes == null || pdfBytes.length == 0) {
+            log.warn("PDF facture abonnement {} vide, envoi ignoré pour {}", invoiceNumber, toEmail);
+            return;
+        }
+        String filename = "facture-abonnement-" + invoiceNumber + ".pdf";
+        emailOutboxService.enqueueWithAttachment(
+                toEmail.trim(),
+                "Votre facture d'abonnement " + invoiceNumber + " - Stock SaaS",
+                buildSubscriptionApprovedEmailContent(recipientName, companyName, invoiceNumber),
+                "SUBSCRIPTION_APPROVED",
+                filename,
+                "application/pdf",
+                pdfBytes
+        );
+    }
+
+    /**
+     * Notifie le demandeur lorsqu'une souscription est refusée par le super admin.
+     */
+    public void sendSubscriptionRejected(
+            String toEmail,
+            String recipientName,
+            String companyName,
+            String rejectionReason
+    ) {
+        if (isBlank(toEmail)) {
+            log.warn("Email souscripteur vide, notification de rejet ignorée pour {}", companyName);
+            return;
+        }
+        emailOutboxService.enqueueTextEmail(
+                toEmail.trim(),
+                "Demande d'abonnement refusée - " + companyName + " - Stock SaaS",
+                buildSubscriptionRejectedEmailContent(
+                        recipientName,
+                        companyName,
+                        rejectionReason,
+                        buildSubscriptionsUrl()
+                ),
+                "SUBSCRIPTION_REJECTED"
+        );
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+
+    private String buildLoginEmailContent(String userName) {
+        return "Bonjour " + userName + ",\n\n" +
+               "Une connexion à votre compte Stock SaaS a été détectée.\n\n" +
+               "Si vous n'êtes pas à l'origine de cette connexion, veuillez contacter immédiatement le support.\n\n" +
+               "Cordialement,\n" +
+               "L'équipe Stock SaaS";
+    }
+
+    private String buildVerificationEmailContent(String userName, String companyName, String verificationUrl) {
+        return "Bonjour " + userName + ",\n\n" +
+               "Bienvenue sur Stock SaaS !\n\n" +
+               "Votre compte a été créé pour l'entreprise : " + companyName + ".\n\n" +
+               "Pour activer votre compte, cliquez sur le lien ci-dessous pour définir votre mot de passe :\n\n" +
+               verificationUrl + "\n\n" +
+               "Ce lien de réinitialisation est valable 2 jours.\n\n" +
+               "Si vous n'avez pas créé de compte, veuillez ignorer cet email.\n\n" +
+               "Cordialement,\n" +
+               "L'équipe Stock SaaS";
+    }
+
+    private String buildAccountActivatedEmailContent(String userName) {
+        return "Bonjour " + userName + ",\n\n" +
+               "Votre compte Stock SaaS a été activé avec succès !\n\n" +
+               "Vous pouvez maintenant vous connecter à votre compte et commencer à gérer votre inventaire.\n\n" +
+               "Cordialement,\n" +
+               "L'équipe Stock SaaS";
     }
 
     private String buildSubscriptionReminderSubject(String companyName, long daysBeforeEnd) {
@@ -196,7 +215,7 @@ public class EmailService {
             String recipientName,
             String companyName,
             String subscriptionKindLabel,
-            java.time.LocalDateTime periodEndAt,
+            LocalDateTime periodEndAt,
             long daysBeforeEnd,
             String subscriptionsUrl
     ) {
@@ -228,43 +247,6 @@ public class EmailService {
                "L'équipe Stock SaaS";
     }
 
-    /**
-     * Envoie la facture d'abonnement en pièce jointe PDF après validation par le super admin.
-     */
-    public void sendSubscriptionApprovedWithInvoice(
-            String toEmail,
-            String recipientName,
-            String companyName,
-            String invoiceNumber,
-            byte[] pdfBytes
-    ) {
-        if (toEmail == null || toEmail.isBlank()) {
-            log.warn("Email souscripteur vide, envoi de la facture d'abonnement {} ignoré", invoiceNumber);
-            return;
-        }
-        if (pdfBytes == null || pdfBytes.length == 0) {
-            log.warn("PDF facture abonnement {} vide, envoi ignoré pour {}", invoiceNumber, toEmail);
-            return;
-        }
-        try {
-            MimeMessage mimeMessage = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
-            helper.setFrom(fromEmail);
-            helper.setTo(toEmail.trim());
-            helper.setSubject("Votre facture d'abonnement " + invoiceNumber + " - Stock SaaS");
-            helper.setText(buildSubscriptionApprovedEmailContent(recipientName, companyName, invoiceNumber), false);
-
-            String filename = "facture-abonnement-" + invoiceNumber + ".pdf";
-            helper.addAttachment(filename, new ByteArrayResource(pdfBytes), "application/pdf");
-
-            mailSender.send(mimeMessage);
-            log.info("Facture d'abonnement {} envoyée par email à {}", invoiceNumber, toEmail);
-        } catch (Exception e) {
-            log.error("Erreur lors de l'envoi de la facture d'abonnement {} à {}: {}",
-                    invoiceNumber, toEmail, e.getMessage());
-        }
-    }
-
     private String buildSubscriptionApprovedEmailContent(
             String recipientName,
             String companyName,
@@ -275,6 +257,35 @@ public class EmailService {
                 + "Vous trouverez en pièce jointe la facture " + invoiceNumber + " au format PDF.\n\n"
                 + "Votre abonnement est désormais actif. Vous pouvez vous connecter à Stock SaaS "
                 + "et profiter de toutes les fonctionnalités de gestion de stock.\n\n"
+                + "Cordialement,\n" +
+                "L'équipe Stock SaaS";
+    }
+
+    private String buildSubscriptionsUrl() {
+        String base = appBaseUrl != null && !appBaseUrl.isBlank() ? appBaseUrl.trim() : "http://localhost:4200";
+        if (base.endsWith("/")) {
+            base = base.substring(0, base.length() - 1);
+        }
+        return base + "/company-admin/subscriptions";
+    }
+
+    private String buildSubscriptionRejectedEmailContent(
+            String recipientName,
+            String companyName,
+            String rejectionReason,
+            String subscriptionsUrl
+    ) {
+        String reason = rejectionReason != null && !rejectionReason.isBlank()
+                ? rejectionReason.trim()
+                : "Demande refusée";
+
+        return "Bonjour " + (recipientName != null && !recipientName.isBlank() ? recipientName : "Administrateur") + ",\n\n"
+                + "Votre demande d'abonnement pour l'entreprise " + companyName + " n'a pas pu être validée.\n\n"
+                + "Motif du refus :\n" + reason + "\n\n"
+                + "Vous pouvez soumettre une nouvelle demande avec un justificatif de paiement corrigé "
+                + "depuis la page Abonnement :\n\n"
+                + subscriptionsUrl + "\n\n"
+                + "Pour toute question, contactez le support Stock SaaS.\n\n"
                 + "Cordialement,\n"
                 + "L'équipe Stock SaaS";
     }

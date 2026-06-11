@@ -36,6 +36,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Gestion du cycle d'abonnement : essai gratuit 1 mois, upgrade, lecture seule.
@@ -204,34 +205,57 @@ public class SubscriptionService {
     }
 
     private void sendSubscriptionApprovalInvoice(CompanySubscriptionRecord record, Company company) {
+        resolveSubscriberContact(record, company).ifPresent(contact -> {
+            try {
+                String invoiceNumber = SubscriptionInvoicePdfService.buildInvoiceNumber(record);
+                byte[] pdf = subscriptionInvoicePdfService.generatePdf(record, company, invoiceNumber);
+                emailService.sendSubscriptionApprovedWithInvoice(
+                        contact.email(),
+                        contact.recipientName(),
+                        contact.companyName(),
+                        invoiceNumber,
+                        pdf
+                );
+            } catch (Exception e) {
+                log.error("Impossible d'envoyer la facture d'abonnement pour le record {}: {}",
+                        record.getId(), e.getMessage());
+            }
+        });
+    }
+
+    private void sendSubscriptionRejectionEmail(CompanySubscriptionRecord record) {
+        Company company = record.getCompany();
+        resolveSubscriberContact(record, company).ifPresent(contact ->
+                emailService.sendSubscriptionRejected(
+                        contact.email(),
+                        contact.recipientName(),
+                        contact.companyName(),
+                        record.getRejectionReason()
+                )
+        );
+    }
+
+    private Optional<SubscriberContact> resolveSubscriberContact(
+            CompanySubscriptionRecord record, Company company) {
         String toEmail = record.getSubscribedByEmail();
         if (toEmail == null || toEmail.isBlank()) {
             toEmail = company.getEmail();
         }
         if (toEmail == null || toEmail.isBlank()) {
-            log.warn("Aucun email pour envoyer la facture d'abonnement (record id={})", record.getId());
-            return;
+            log.warn("Aucun email pour notifier le demandeur (record id={})", record.getId());
+            return Optional.empty();
         }
-
         String recipientName = userRepository.findByEmail(toEmail.trim())
                 .map(User::getName)
                 .orElse(company.getName());
-
-        try {
-            String invoiceNumber = SubscriptionInvoicePdfService.buildInvoiceNumber(record);
-            byte[] pdf = subscriptionInvoicePdfService.generatePdf(record, company, invoiceNumber);
-            emailService.sendSubscriptionApprovedWithInvoice(
-                    toEmail,
-                    recipientName,
-                    company.getName(),
-                    invoiceNumber,
-                    pdf
-            );
-        } catch (Exception e) {
-            log.error("Impossible d'envoyer la facture d'abonnement pour le record {}: {}",
-                    record.getId(), e.getMessage());
-        }
+        return Optional.of(new SubscriberContact(
+                toEmail.trim(),
+                recipientName,
+                company.getName()
+        ));
     }
+
+    private record SubscriberContact(String email, String recipientName, String companyName) {}
 
     @Transactional
     public SubscriptionRecordDTO rejectRequest(Long recordId, String adminEmail, String reason) {
@@ -243,6 +267,8 @@ public class SubscriptionService {
         record.setValidatedAt(LocalDateTime.now());
         record.setRejectionReason(reason != null && !reason.isBlank() ? reason.trim() : "Demande refusée");
         record = subscriptionRecordRepository.save(record);
+
+        sendSubscriptionRejectionEmail(record);
 
         return toRecordDto(record, adminEmail);
     }
