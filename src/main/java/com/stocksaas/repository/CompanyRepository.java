@@ -116,6 +116,15 @@ public interface CompanyRepository extends JpaRepository<Company, Long> {
            "AND (LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%')) " +
            "OR LOWER(c.email) LIKE LOWER(CONCAT('%', :search, '%')))")
     Page<Company> findAllNotDeletedWithSearch(@Param("search") String search, Pageable pageable);
+
+    @Query("SELECT COUNT(c) FROM Company c WHERE c.isDeleted = false "
+            + "AND c.status IS NOT NULL AND LOWER(c.status.code) = 'actif'")
+    long countActiveCompanies();
+
+    @Query("SELECT COUNT(c) FROM Company c WHERE c.isDeleted = false "
+            + "AND c.createdAt >= :start AND c.createdAt < :end")
+    long countCreatedBetween(@Param("start") java.time.LocalDateTime start,
+                             @Param("end") java.time.LocalDateTime end);
     
     /**
      * Compte les entreprises créées par mois (6 derniers mois)

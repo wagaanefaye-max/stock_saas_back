@@ -18,10 +18,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.text.NumberFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -153,9 +155,34 @@ public class DashboardService {
             log.warn("Erreur lors du comptage des utilisateurs", e);
         }
         
-        // Pour l'instant, revenus et tickets sont des valeurs de base
         String monthlyRevenue = "0 FCFA";
         Long supportTickets = 0L;
+        String companiesChange = "+0";
+        String usersChange = "+0";
+        String revenueChange = "+0%";
+        String ticketsChange = "0";
+        try {
+            monthlyRevenue = computeMonthlyRevenueLabel();
+            revenueChange = computeMonthlyRevenueChange();
+        } catch (Exception e) {
+            log.warn("Erreur lors du calcul des revenus mensuels", e);
+        }
+        try {
+            supportTickets = countPendingSubscriptionRequests();
+            ticketsChange = formatDelta(supportTickets, countPendingSubscriptionsPreviousMonth());
+        } catch (Exception e) {
+            log.warn("Erreur lors du comptage des souscriptions en attente", e);
+        }
+        try {
+            companiesChange = formatDelta(
+                    countCompaniesCreatedCurrentMonth(),
+                    countCompaniesCreatedPreviousMonth());
+            usersChange = formatPercentDelta(
+                    countUsersCreatedCurrentMonth(),
+                    countUsersCreatedPreviousMonth());
+        } catch (Exception e) {
+            log.warn("Erreur lors du calcul des variations entreprises/utilisateurs", e);
+        }
         
         // Récupérer les données réelles pour les graphiques
         java.time.LocalDateTime sixMonthsAgo = java.time.LocalDateTime.now().minusMonths(6);
@@ -206,28 +233,110 @@ public class DashboardService {
                 .monthlySubscriptionsData(monthlySubscriptionsData)
                 .planDistribution(planData)
                 .recentCompanies(recentCompaniesDTO)
-                .companiesChange("+0")
-                .usersChange("+0%")
-                .revenueChange("+0%")
-                .ticketsChange("0")
+                .companiesChange(companiesChange)
+                .usersChange(usersChange)
+                .revenueChange(revenueChange)
+                .ticketsChange(ticketsChange)
                 .build();
     }
     
     // Méthodes helper isolées dans leurs propres transactions
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     private Long countActiveCompanies() {
-        return companyRepository.findAll().stream()
-                .filter(c -> c != null && !c.getIsDeleted() && 
-                           c.getStatus() != null && 
-                           "ACTIF".equals(c.getStatus().getCode()))
-                .count();
+        return companyRepository.countActiveCompanies();
     }
     
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     private Long countTotalUsers() {
-        return userRepository.findAll().stream()
-                .filter(u -> u != null && !u.getIsDeleted() && !u.isSuperAdmin())
-                .count();
+        return userRepository.countAllExceptSuperAdmin();
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+    private long countPendingSubscriptionRequests() {
+        return subscriptionRecordRepository.countByRequestStatusAndIsDeletedFalse(
+                SubscriptionRequestStatusCode.PENDING);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+    private long countPendingSubscriptionsPreviousMonth() {
+        YearMonth previous = YearMonth.now().minusMonths(1);
+        return subscriptionRecordRepository.countByStatusCreatedBetween(
+                SubscriptionRequestStatusCode.PENDING,
+                previous.atDay(1).atStartOfDay(),
+                previous.plusMonths(1).atDay(1).atStartOfDay());
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+    private long countCompaniesCreatedCurrentMonth() {
+        YearMonth current = YearMonth.now();
+        return companyRepository.countCreatedBetween(
+                current.atDay(1).atStartOfDay(),
+                current.plusMonths(1).atDay(1).atStartOfDay());
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+    private long countCompaniesCreatedPreviousMonth() {
+        YearMonth previous = YearMonth.now().minusMonths(1);
+        return companyRepository.countCreatedBetween(
+                previous.atDay(1).atStartOfDay(),
+                previous.plusMonths(1).atDay(1).atStartOfDay());
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+    private long countUsersCreatedCurrentMonth() {
+        YearMonth current = YearMonth.now();
+        return userRepository.countCreatedBetweenExceptSuperAdmin(
+                current.atDay(1).atStartOfDay(),
+                current.plusMonths(1).atDay(1).atStartOfDay());
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+    private long countUsersCreatedPreviousMonth() {
+        YearMonth previous = YearMonth.now().minusMonths(1);
+        return userRepository.countCreatedBetweenExceptSuperAdmin(
+                previous.atDay(1).atStartOfDay(),
+                previous.plusMonths(1).atDay(1).atStartOfDay());
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+    private String computeMonthlyRevenueLabel() {
+        double amount = sumApprovedRevenueForMonth(YearMonth.now());
+        NumberFormat formatter = NumberFormat.getIntegerInstance(Locale.FRENCH);
+        return formatter.format(Math.round(amount)) + " FCFA";
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+    private String computeMonthlyRevenueChange() {
+        double current = sumApprovedRevenueForMonth(YearMonth.now());
+        double previous = sumApprovedRevenueForMonth(YearMonth.now().minusMonths(1));
+        return formatPercentDelta(Math.round(current), Math.round(previous));
+    }
+
+    private double sumApprovedRevenueForMonth(YearMonth month) {
+        LocalDateTime start = month.atDay(1).atStartOfDay();
+        LocalDateTime end = month.plusMonths(1).atDay(1).atStartOfDay();
+        Double sum = subscriptionRecordRepository.sumAmountPaidByStatusValidatedBetween(
+                SubscriptionRequestStatusCode.APPROVED, start, end);
+        return sum != null ? sum : 0D;
+    }
+
+    private String formatDelta(long current, long previous) {
+        long delta = current - previous;
+        if (delta > 0) {
+            return "+" + delta;
+        }
+        return String.valueOf(delta);
+    }
+
+    private String formatPercentDelta(long current, long previous) {
+        if (previous <= 0) {
+            return current > 0 ? "+100%" : "0%";
+        }
+        long deltaPercent = Math.round(((current - previous) * 100.0) / previous);
+        if (deltaPercent > 0) {
+            return "+" + deltaPercent + "%";
+        }
+        return deltaPercent + "%";
     }
     
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)

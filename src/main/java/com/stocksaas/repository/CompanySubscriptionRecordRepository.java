@@ -45,4 +45,18 @@ public interface CompanySubscriptionRecordRepository extends JpaRepository<Compa
 
     @Query("SELECT r FROM CompanySubscriptionRecord r WHERE r.isDeleted = false AND r.createdAt >= :startDate")
     List<CompanySubscriptionRecord> findByCreatedAtAfterAndIsDeletedFalse(@Param("startDate") LocalDateTime startDate);
+
+    @Query("SELECT COALESCE(SUM(r.amountPaid), 0) FROM CompanySubscriptionRecord r "
+            + "WHERE r.isDeleted = false AND r.requestStatus = :status "
+            + "AND r.validatedAt IS NOT NULL AND r.validatedAt >= :start AND r.validatedAt < :end")
+    Double sumAmountPaidByStatusValidatedBetween(@Param("status") String status,
+                                                 @Param("start") LocalDateTime start,
+                                                 @Param("end") LocalDateTime end);
+
+    @Query("SELECT COUNT(r) FROM CompanySubscriptionRecord r "
+            + "WHERE r.isDeleted = false AND r.requestStatus = :status "
+            + "AND r.createdAt >= :start AND r.createdAt < :end")
+    long countByStatusCreatedBetween(@Param("status") String status,
+                                     @Param("start") LocalDateTime start,
+                                     @Param("end") LocalDateTime end);
 }

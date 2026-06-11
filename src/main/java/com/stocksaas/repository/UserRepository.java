@@ -87,6 +87,14 @@ public interface UserRepository extends JpaRepository<User, Long> {
            "AND u.email IS NOT NULL")
     List<User> findCompanyAdminsByCompanyId(@Param("companyId") Long companyId);
 
+    @Query("SELECT COUNT(u) FROM User u WHERE u.isDeleted = false AND u.role.code <> 'SUPER_ADMIN'")
+    long countAllExceptSuperAdmin();
+
+    @Query("SELECT COUNT(u) FROM User u WHERE u.isDeleted = false AND u.role.code <> 'SUPER_ADMIN' "
+            + "AND u.createdAt >= :start AND u.createdAt < :end")
+    long countCreatedBetweenExceptSuperAdmin(@Param("start") java.time.LocalDateTime start,
+                                             @Param("end") java.time.LocalDateTime end);
+
     @Query("SELECT u FROM User u JOIN FETCH u.role WHERE u.isDeleted = false " +
            "AND u.role.code = 'SUPER_ADMIN' AND u.email IS NOT NULL")
     List<User> findActiveSuperAdmins();
