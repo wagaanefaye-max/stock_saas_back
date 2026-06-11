@@ -14,6 +14,10 @@ spring:
     driver-class-name: org.postgresql.Driver
   jpa:
     show-sql: false
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=5,expireAfterWrite=2m
   servlet:
     multipart:
       max-file-size: 5MB

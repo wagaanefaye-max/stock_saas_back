@@ -95,6 +95,15 @@ public interface UserRepository extends JpaRepository<User, Long> {
     long countCreatedBetweenExceptSuperAdmin(@Param("start") java.time.LocalDateTime start,
                                              @Param("end") java.time.LocalDateTime end);
 
+    @Query("SELECT "
+            + "COALESCE(SUM(CASE WHEN u.createdAt >= :currentStart AND u.createdAt < :currentEnd THEN 1 ELSE 0 END), 0), "
+            + "COALESCE(SUM(CASE WHEN u.createdAt >= :prevStart AND u.createdAt < :prevEnd THEN 1 ELSE 0 END), 0) "
+            + "FROM User u WHERE u.isDeleted = false AND u.role.code <> 'SUPER_ADMIN'")
+    Object[] countUsersCreatedCurrentAndPrevious(@Param("currentStart") java.time.LocalDateTime currentStart,
+                                                 @Param("currentEnd") java.time.LocalDateTime currentEnd,
+                                                 @Param("prevStart") java.time.LocalDateTime prevStart,
+                                                 @Param("prevEnd") java.time.LocalDateTime prevEnd);
+
     @Query("SELECT u FROM User u JOIN FETCH u.role WHERE u.isDeleted = false " +
            "AND u.role.code = 'SUPER_ADMIN' AND u.email IS NOT NULL")
     List<User> findActiveSuperAdmins();
