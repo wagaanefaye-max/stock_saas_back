@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS tp_platform_settings (
     id BIGINT PRIMARY KEY,
     subscription_monthly_price_fcfa DOUBLE PRECISION NOT NULL DEFAULT 5000,
     maintenance_mode BOOLEAN NOT NULL DEFAULT FALSE,
+    maintenance_message TEXT,
     allow_new_registrations BOOLEAN NOT NULL DEFAULT TRUE
 );
 

@@ -39,6 +39,7 @@ import java.util.List;
 public class SecurityConfig {
     
     private final JwtAuthenticationFilter jwtAuthFilter;
+    private final MaintenanceModeFilter maintenanceModeFilter;
     private final SubscriptionWriteAccessFilter subscriptionWriteAccessFilter;
     private final UserDetailsService userDetailsService;
 
@@ -58,7 +59,7 @@ public class SecurityConfig {
                     "/api/auth/verify-account",
                     "/api/auth/forgot-password",
                     "/api/auth/logout",
-                    "/api/public/invoices/**",
+                    "/api/public/**",
                     "/swagger-ui/**",
                     "/swagger-ui.html",
                     "/api-docs/**",
@@ -83,7 +84,8 @@ public class SecurityConfig {
             )
             .authenticationProvider(authenticationProvider())
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
-            .addFilterAfter(subscriptionWriteAccessFilter, JwtAuthenticationFilter.class);
+            .addFilterAfter(maintenanceModeFilter, JwtAuthenticationFilter.class)
+            .addFilterAfter(subscriptionWriteAccessFilter, MaintenanceModeFilter.class);
         
         return http.build();
     }

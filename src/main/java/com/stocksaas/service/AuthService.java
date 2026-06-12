@@ -56,6 +56,7 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final EmailService emailService;
     private final SubscriptionService subscriptionService;
+    private final PlatformSettingsService platformSettingsService;
     
     /**
      * Domaines d'emails jetables à refuser (yopmail, mailinator, etc.).
@@ -83,6 +84,14 @@ public class AuthService {
         // Vérifier si le compte est validé (a un mot de passe)
         if (user.getPassword() == null) {
             throw new RuntimeException("Votre compte n'est pas encore activé. Veuillez vérifier votre email et cliquer sur le lien de validation.");
+        }
+
+        if (platformSettingsService.isMaintenanceModeEnabled()) {
+            if (user.getRole() == null || !"SUPER_ADMIN".equals(user.getRole().getCode())) {
+                throw new RuntimeException(
+                        "La plateforme est en maintenance. Seuls les super administrateurs peuvent se connecter."
+                );
+            }
         }
         
         Authentication authentication = authenticationManager.authenticate(
@@ -123,6 +132,13 @@ public class AuthService {
      */
     @Transactional
     public RegisterResponse register(RegisterRequest request) {
+        if (platformSettingsService.isMaintenanceModeEnabled()) {
+            throw new RuntimeException("Les inscriptions sont suspendues pendant la maintenance de la plateforme.");
+        }
+        if (!platformSettingsService.isAllowNewRegistrations()) {
+            throw new RuntimeException("Les nouvelles inscriptions sont temporairement fermées.");
+        }
+
         // Refuser les adresses jetables (yopmail, mailinator, etc.)
         validateEmailNotDisposable(request.getEmail());
 

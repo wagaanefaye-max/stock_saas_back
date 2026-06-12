@@ -30,6 +30,9 @@ public class PlatformSettings {
     @Column(name = "maintenance_mode", nullable = false)
     private Boolean maintenanceMode = false;
 
+    @Column(name = "maintenance_message", columnDefinition = "TEXT")
+    private String maintenanceMessage;
+
     @Column(name = "allow_new_registrations", nullable = false)
     private Boolean allowNewRegistrations = true;
 }

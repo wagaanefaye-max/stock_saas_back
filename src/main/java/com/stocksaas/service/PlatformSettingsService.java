@@ -1,6 +1,7 @@
 package com.stocksaas.service;
 
 import com.stocksaas.dto.PlatformSettingsDTO;
+import com.stocksaas.dto.PlatformStatusDTO;
 import com.stocksaas.model.PlatformSettings;
 import com.stocksaas.model.User;
 import com.stocksaas.repository.PlatformSettingsRepository;
@@ -26,6 +27,30 @@ public class PlatformSettingsService {
     }
 
     @Transactional(readOnly = true)
+    public boolean isMaintenanceModeEnabled() {
+        return platformSettingsRepository.findById(PlatformSettings.SINGLETON_ID)
+                .map(settings -> Boolean.TRUE.equals(settings.getMaintenanceMode()))
+                .orElse(false);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isAllowNewRegistrations() {
+        return platformSettingsRepository.findById(PlatformSettings.SINGLETON_ID)
+                .map(settings -> settings.getAllowNewRegistrations() == null || settings.getAllowNewRegistrations())
+                .orElse(true);
+    }
+
+    @Transactional(readOnly = true)
+    public PlatformStatusDTO getPublicStatus() {
+        PlatformSettings settings = getOrCreate();
+        return PlatformStatusDTO.builder()
+                .maintenanceMode(Boolean.TRUE.equals(settings.getMaintenanceMode()))
+                .allowNewRegistrations(settings.getAllowNewRegistrations() == null || settings.getAllowNewRegistrations())
+                .maintenanceMessage(settings.getMaintenanceMessage())
+                .build();
+    }
+
+    @Transactional(readOnly = true)
     public double getMonthlyPriceFcfa() {
         PlatformSettings settings = getOrCreate();
         Double price = settings.getSubscriptionMonthlyPriceFcfa();
@@ -46,6 +71,7 @@ public class PlatformSettingsService {
         PlatformSettings settings = getOrCreate();
         settings.setSubscriptionMonthlyPriceFcfa(dto.getSubscriptionMonthlyPriceFcfa());
         settings.setMaintenanceMode(Boolean.TRUE.equals(dto.getMaintenanceMode()));
+        settings.setMaintenanceMessage(normalizeMaintenanceMessage(dto.getMaintenanceMessage()));
         settings.setAllowNewRegistrations(dto.getAllowNewRegistrations() == null || dto.getAllowNewRegistrations());
         platformSettingsRepository.save(settings);
 
@@ -87,7 +113,16 @@ public class PlatformSettingsService {
         return PlatformSettingsDTO.builder()
                 .subscriptionMonthlyPriceFcfa(settings.getSubscriptionMonthlyPriceFcfa())
                 .maintenanceMode(settings.getMaintenanceMode())
+                .maintenanceMessage(settings.getMaintenanceMessage())
                 .allowNewRegistrations(settings.getAllowNewRegistrations())
                 .build();
+    }
+
+    private static String normalizeMaintenanceMessage(String message) {
+        if (message == null) {
+            return null;
+        }
+        String trimmed = message.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }
