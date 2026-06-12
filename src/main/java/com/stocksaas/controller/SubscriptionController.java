@@ -1,11 +1,14 @@
 package com.stocksaas.controller;
 
+import com.stocksaas.dto.PaymentQrAvailabilityDTO;
 import com.stocksaas.dto.RejectSubscriptionRequest;
 import com.stocksaas.dto.SubscriptionDurationDTO;
 import com.stocksaas.dto.SubscriptionPlanOptionDTO;
 import com.stocksaas.dto.SubscriptionRecordDTO;
 import com.stocksaas.dto.SubscriptionRequestsPageResponse;
 import com.stocksaas.dto.SubscriptionStatusDTO;
+import com.stocksaas.dto.ProofResourceResult;
+import com.stocksaas.service.PlatformPaymentQrService;
 import com.stocksaas.service.SubscriptionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -41,6 +44,7 @@ import java.util.Map;
 public class SubscriptionController {
 
     private final SubscriptionService subscriptionService;
+    private final PlatformPaymentQrService platformPaymentQrService;
 
     @GetMapping("/status")
     @Operation(summary = "Statut d'abonnement")
@@ -56,6 +60,24 @@ public class SubscriptionController {
     @GetMapping("/durations")
     public ResponseEntity<List<SubscriptionDurationDTO>> listDurations() {
         return ResponseEntity.ok(subscriptionService.listDurations());
+    }
+
+    @GetMapping("/payment-qr/availability")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Disponibilité des QR codes marchands")
+    public ResponseEntity<PaymentQrAvailabilityDTO> getPaymentQrAvailability() {
+        return ResponseEntity.ok(platformPaymentQrService.getAvailability());
+    }
+
+    @GetMapping("/payment-qr/{provider}")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "QR code marchand Wave ou Orange Money")
+    public ResponseEntity<Resource> getPaymentQr(@PathVariable String provider) throws Exception {
+        ProofResourceResult qr = platformPaymentQrService.loadPaymentQr(provider);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(qr.contentType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"qr-" + provider.toLowerCase() + "\"")
+                .body(qr.resource());
     }
 
     @PostMapping(value = "/request", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

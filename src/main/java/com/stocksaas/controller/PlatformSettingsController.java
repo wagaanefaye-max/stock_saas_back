@@ -1,16 +1,22 @@
 package com.stocksaas.controller;
 
 import com.stocksaas.dto.PlatformSettingsDTO;
+import com.stocksaas.dto.ProofResourceResult;
+import com.stocksaas.service.PlatformPaymentQrService;
 import com.stocksaas.service.PlatformSettingsService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/platform-settings")
@@ -31,6 +37,7 @@ import org.springframework.web.bind.annotation.*;
 public class PlatformSettingsController {
 
     private final PlatformSettingsService platformSettingsService;
+    private final PlatformPaymentQrService platformPaymentQrService;
 
     @GetMapping
     @Operation(summary = "Lire les paramètres plateforme")
@@ -46,6 +53,40 @@ public class PlatformSettingsController {
             @AuthenticationPrincipal UserDetails userDetails) {
         requireAuthenticated(userDetails);
         return ResponseEntity.ok(platformSettingsService.updateSettings(body, userDetails.getUsername()));
+    }
+
+    @PostMapping(value = "/payment-qr/{provider}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Téléverser le QR code marchand Wave ou Orange Money")
+    public ResponseEntity<PlatformSettingsDTO> uploadPaymentQr(
+            @PathVariable String provider,
+            @RequestPart("image") MultipartFile image,
+            @AuthenticationPrincipal UserDetails userDetails) throws Exception {
+        requireAuthenticated(userDetails);
+        platformPaymentQrService.uploadPaymentQr(provider, image);
+        return ResponseEntity.ok(platformSettingsService.getSettings(userDetails.getUsername()));
+    }
+
+    @DeleteMapping("/payment-qr/{provider}")
+    @Operation(summary = "Supprimer le QR code marchand")
+    public ResponseEntity<PlatformSettingsDTO> deletePaymentQr(
+            @PathVariable String provider,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        requireAuthenticated(userDetails);
+        platformPaymentQrService.deletePaymentQr(provider);
+        return ResponseEntity.ok(platformSettingsService.getSettings(userDetails.getUsername()));
+    }
+
+    @GetMapping("/payment-qr/{provider}")
+    @Operation(summary = "Aperçu du QR code marchand")
+    public ResponseEntity<Resource> getPaymentQrPreview(
+            @PathVariable String provider,
+            @AuthenticationPrincipal UserDetails userDetails) throws Exception {
+        requireAuthenticated(userDetails);
+        ProofResourceResult qr = platformPaymentQrService.loadPaymentQr(provider);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(qr.contentType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"qr-" + provider.toLowerCase() + "\"")
+                .body(qr.resource());
     }
 
     private void requireAuthenticated(UserDetails userDetails) {

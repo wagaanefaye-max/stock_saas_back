@@ -26,4 +26,7 @@ public class PlatformSettingsDTO {
 
     @NotNull(message = "L'option d'inscription est obligatoire")
     private Boolean allowNewRegistrations;
+
+    private Boolean hasWaveQr;
+    private Boolean hasOrangeMoneyQr;
 }

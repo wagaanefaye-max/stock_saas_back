@@ -3,6 +3,7 @@ package com.stocksaas.model;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -35,4 +36,18 @@ public class PlatformSettings {
 
     @Column(name = "allow_new_registrations", nullable = false)
     private Boolean allowNewRegistrations = true;
+
+    @Lob
+    @Column(name = "wave_qr_data")
+    private byte[] waveQrData;
+
+    @Column(name = "wave_qr_content_type", length = 100)
+    private String waveQrContentType;
+
+    @Lob
+    @Column(name = "orange_money_qr_data")
+    private byte[] orangeMoneyQrData;
+
+    @Column(name = "orange_money_qr_content_type", length = 100)
+    private String orangeMoneyQrContentType;
 }

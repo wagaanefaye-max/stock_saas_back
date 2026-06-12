@@ -115,7 +115,13 @@ public class PlatformSettingsService {
                 .maintenanceMode(settings.getMaintenanceMode())
                 .maintenanceMessage(settings.getMaintenanceMessage())
                 .allowNewRegistrations(settings.getAllowNewRegistrations())
+                .hasWaveQr(hasQrData(settings.getWaveQrData()))
+                .hasOrangeMoneyQr(hasQrData(settings.getOrangeMoneyQrData()))
                 .build();
+    }
+
+    private static boolean hasQrData(byte[] data) {
+        return data != null && data.length > 0;
     }
 
     private static String normalizeMaintenanceMessage(String message) {
