@@ -365,6 +365,27 @@ public class AuthService {
     }
     
     /**
+     * Retourne les informations de session pour l'utilisateur connecté.
+     */
+    @Transactional(readOnly = true)
+    public AuthResponse getCurrentSession(String email) {
+        User user = userRepository.findByEmailWithCompanyAndRole(email)
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+        if (Boolean.TRUE.equals(user.getIsDeleted()) || user.getPassword() == null) {
+            throw new RuntimeException("Session invalide");
+        }
+        AuthResponse response = AuthResponse.builder()
+                .email(user.getEmail())
+                .name(user.getName())
+                .role(user.getRole() != null ? user.getRole().getCode() : null)
+                .companyId(user.getCompany() != null ? user.getCompany().getId() : null)
+                .companyName(user.getCompany() != null ? user.getCompany().getName() : null)
+                .build();
+        subscriptionService.enrichAuthResponse(response, user);
+        return response;
+    }
+
+    /**
      * Génère un token de validation unique
      */
     private String generateVerificationToken() {

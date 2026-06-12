@@ -11,7 +11,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -150,7 +149,6 @@ public class DashboardController {
     }
     
     @GetMapping("/super-admin/stats")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "Statistiques du dashboard Super Admin", description = "Récupère les statistiques du dashboard pour le Super Admin")
     public ResponseEntity<SuperAdminDashboardStatsDTO> getSuperAdminDashboardStats() {
         try {

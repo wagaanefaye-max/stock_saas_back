@@ -116,37 +116,16 @@ public interface CompanyRepository extends JpaRepository<Company, Long> {
            "AND (LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%')) " +
            "OR LOWER(c.email) LIKE LOWER(CONCAT('%', :search, '%')))")
     Page<Company> findAllNotDeletedWithSearch(@Param("search") String search, Pageable pageable);
-
-    @Query("SELECT COUNT(c) FROM Company c WHERE c.isDeleted = false "
-            + "AND c.status IS NOT NULL AND LOWER(c.status.code) = 'actif'")
-    long countActiveCompanies();
-
-    @Query("SELECT COUNT(c) FROM Company c WHERE c.isDeleted = false "
-            + "AND c.createdAt >= :start AND c.createdAt < :end")
-    long countCreatedBetween(@Param("start") java.time.LocalDateTime start,
-                             @Param("end") java.time.LocalDateTime end);
     
     /**
-     * Compte les entreprises créées par année/mois (agrégation SQL, sans dépendre de la locale PostgreSQL).
+     * Compte les entreprises créées par mois (6 derniers mois)
      */
-    @Query(value = "SELECT EXTRACT(YEAR FROM c.created_at)::int, EXTRACT(MONTH FROM c.created_at)::int, COUNT(c.id) "
-            + "FROM td_companies c "
-            + "WHERE c.created_at >= CAST(:startDate AS timestamp) AND c.is_deleted = false "
-            + "GROUP BY EXTRACT(YEAR FROM c.created_at), EXTRACT(MONTH FROM c.created_at)", nativeQuery = true)
-    List<Object[]> countCompaniesByYearMonth(@Param("startDate") java.time.LocalDateTime startDate);
-
-    @Query(value = "SELECT "
-            + "COALESCE(SUM(CASE WHEN c.created_at >= :currentStart AND c.created_at < :currentEnd THEN 1 ELSE 0 END), 0), "
-            + "COALESCE(SUM(CASE WHEN c.created_at >= :prevStart AND c.created_at < :prevEnd THEN 1 ELSE 0 END), 0) "
-            + "FROM td_companies c WHERE c.is_deleted = false", nativeQuery = true)
-    Object[] countCompaniesCreatedCurrentAndPrevious(@Param("currentStart") java.time.LocalDateTime currentStart,
-                                                     @Param("currentEnd") java.time.LocalDateTime currentEnd,
-                                                     @Param("prevStart") java.time.LocalDateTime prevStart,
-                                                     @Param("prevEnd") java.time.LocalDateTime prevEnd);
-
-    @Query("SELECT DISTINCT c FROM Company c LEFT JOIN FETCH c.plan LEFT JOIN FETCH c.status "
-            + "WHERE c.isDeleted = false ORDER BY c.createdAt DESC")
-    List<Company> findRecentWithPlanAndStatus(Pageable pageable);
+    @Query(value = "SELECT TO_CHAR(c.created_at, 'Mon') as month, COUNT(c.id) as count " +
+           "FROM td_companies c " +
+           "WHERE c.created_at >= CAST(:startDate AS timestamp) AND c.is_deleted = false " +
+           "GROUP BY TO_CHAR(c.created_at, 'Mon'), EXTRACT(YEAR FROM c.created_at), EXTRACT(MONTH FROM c.created_at) " +
+           "ORDER BY EXTRACT(YEAR FROM c.created_at) DESC, EXTRACT(MONTH FROM c.created_at) DESC", nativeQuery = true)
+    List<Object[]> countCompaniesByMonth(@Param("startDate") java.time.LocalDateTime startDate);
     
     /**
      * Compte les entreprises par plan d'abonnement
