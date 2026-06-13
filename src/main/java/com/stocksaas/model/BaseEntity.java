@@ -3,7 +3,6 @@ package com.stocksaas.model;
 import jakarta.persistence.*;
 import lombok.Data;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 
@@ -22,10 +21,15 @@ public abstract class BaseEntity {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
     
-    @UpdateTimestamp
+    /** Renseigné uniquement lors d'une vraie modification (pas à la création). */
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
     
     @Column(name = "is_deleted", nullable = false)
     private Boolean isDeleted = false;
+
+    @PreUpdate
+    protected void onPreUpdate() {
+        this.updatedAt = LocalDateTime.now();
+    }
 }

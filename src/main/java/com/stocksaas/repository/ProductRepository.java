@@ -4,6 +4,7 @@ import com.stocksaas.model.Product;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -75,4 +76,8 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
     @EntityGraph(attributePaths = {"stockLevels", "stockLevels.warehouse", "company"})
     @Query("SELECT p FROM Product p WHERE p.id = :id")
     Optional<Product> findByIdWithStockLevels(@Param("id") Long id);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Product p SET p.updatedAt = null WHERE p.id = :id")
+    void clearUpdatedAt(@Param("id") Long id);
 }

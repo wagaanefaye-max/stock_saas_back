@@ -127,6 +127,11 @@ public class ProductService {
                 productRepository.save(savedProduct);
             }
         }
+
+        productRepository.clearUpdatedAt(savedProduct.getId());
+        savedProduct = productRepository.findByIdWithStockLevels(savedProduct.getId())
+                .orElse(savedProduct);
+        savedProduct.setUpdatedAt(null);
         
         return mapToDTO(savedProduct);
     }
@@ -481,7 +486,14 @@ public class ProductService {
                 .minThreshold(minThreshold)
                 .lowStock(lowStock)
                 .createdAt(product.getCreatedAt())
-                .updatedAt(product.getUpdatedAt())
+                .updatedAt(resolveUpdatedAt(product.getCreatedAt(), product.getUpdatedAt()))
                 .build();
+    }
+
+    private static LocalDateTime resolveUpdatedAt(LocalDateTime createdAt, LocalDateTime updatedAt) {
+        if (updatedAt == null || createdAt == null) {
+            return null;
+        }
+        return updatedAt.isAfter(createdAt) ? updatedAt : null;
     }
 }
