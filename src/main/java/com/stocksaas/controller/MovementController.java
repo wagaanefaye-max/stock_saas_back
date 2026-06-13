@@ -68,6 +68,17 @@ public class MovementController {
                     .orElse(null);
 
             if (user == null || user.getCompany() == null) {
+                if (page != null && size != null && size > 0) {
+                    return ResponseEntity.ok(PageResponse.<MovementDTO>builder()
+                            .content(List.of())
+                            .page(page)
+                            .size(size)
+                            .totalElements(0)
+                            .totalPages(0)
+                            .first(true)
+                            .last(true)
+                            .build());
+                }
                 return ResponseEntity.ok(List.of());
             }
 
