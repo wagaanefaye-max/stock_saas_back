@@ -8,7 +8,6 @@ import com.stocksaas.model.MovementType;
 import com.stocksaas.model.User;
 import com.stocksaas.repository.MovementTypeRepository;
 import com.stocksaas.repository.UserRepository;
-import com.stocksaas.repository.UserWarehouseRepository;
 import com.stocksaas.security.SecurityAccessService;
 import com.stocksaas.service.MovementService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -48,7 +47,6 @@ public class MovementController {
     
     private final MovementService movementService;
     private final UserRepository userRepository;
-    private final UserWarehouseRepository userWarehouseRepository;
     private final MovementTypeRepository movementTypeRepository;
     private final SecurityAccessService securityAccessService;
     
@@ -77,12 +75,7 @@ public class MovementController {
 
             List<Long> warehouseIds = null;
             if (user.getRole() != null && "GESTIONNAIRE".equals(user.getRole().getCode())) {
-                warehouseIds = userWarehouseRepository.findAll().stream()
-                        .filter(uw -> uw.getUser() != null && uw.getUser().getId() != null &&
-                                   uw.getUser().getId().equals(user.getId()))
-                        .filter(uw -> uw.getWarehouse() != null && uw.getWarehouse().getId() != null)
-                        .map(uw -> uw.getWarehouse().getId())
-                        .collect(Collectors.toList());
+                warehouseIds = securityAccessService.getAssignedWarehouseIds(user);
             }
 
             if (page != null && size != null && size > 0) {

@@ -12,6 +12,7 @@ import com.stocksaas.repository.CompanyRepository;
 import com.stocksaas.repository.UserRepository;
 import com.stocksaas.repository.UserRoleRepository;
 import com.stocksaas.security.SecurityAccessService;
+import com.stocksaas.security.UserDetailsCacheEvictor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -30,6 +31,7 @@ public class UserService {
     private final UserRoleRepository userRoleRepository;
     private final CompanyRepository companyRepository;
     private final SecurityAccessService securityAccessService;
+    private final UserDetailsCacheEvictor userDetailsCacheEvictor;
     
     /**
      * Liste paginée selon le rôle de l'appelant (super-admin : tous ; admin entreprise : gestionnaires de son entreprise).
@@ -157,6 +159,7 @@ public class UserService {
         }
         
         user = userRepository.save(user);
+        userDetailsCacheEvictor.evict(user.getEmail());
         return mapToDTO(user);
     }
     
@@ -173,6 +176,7 @@ public class UserService {
         
         user.setStatus(request.getStatus());
         user = userRepository.save(user);
+        userDetailsCacheEvictor.evict(user.getEmail());
         return mapToDTO(user);
     }
     
@@ -190,6 +194,7 @@ public class UserService {
         // Soft delete
         user.setIsDeleted(true);
         userRepository.save(user);
+        userDetailsCacheEvictor.evict(user.getEmail());
     }
     
     /**

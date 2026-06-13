@@ -722,6 +722,22 @@ public class SubscriptionService {
                 .build();
     }
 
+    public void enrichAuthResponseLight(com.stocksaas.dto.AuthResponse response, User user) {
+        if (user.getCompany() == null) {
+            response.setReadOnly(false);
+            response.setSubscriptionStatus(null);
+            return;
+        }
+        SubscriptionStatusDTO status = buildStatusDto(user.getCompany());
+        response.setSubscriptionStatus(status.getSubscriptionStatus());
+        response.setSubscriptionStatusLabel(status.getSubscriptionStatusLabel());
+        response.setTrialEndsAt(status.getTrialEndsAt());
+        response.setSubscriptionEndsAt(status.getSubscriptionEndsAt());
+        response.setReadOnly(status.isReadOnly());
+        response.setPlanCode(status.getPlanCode());
+        response.setDaysRemaining(status.getDaysRemaining());
+    }
+
     public void enrichAuthResponse(com.stocksaas.dto.AuthResponse response, User user) {
         if (user.getCompany() == null) {
             response.setReadOnly(false);

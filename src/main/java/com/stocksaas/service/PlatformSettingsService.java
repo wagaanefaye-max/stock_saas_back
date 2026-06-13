@@ -9,6 +9,8 @@ import com.stocksaas.repository.SubscriptionPlanRepository;
 import com.stocksaas.repository.UserRepository;
 import com.stocksaas.subscription.SubscriptionPricing;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,21 +30,28 @@ public class PlatformSettingsService {
 
     @Transactional(readOnly = true)
     public boolean isMaintenanceModeEnabled() {
-        return platformSettingsRepository.findById(PlatformSettings.SINGLETON_ID)
+        return readCachedSettings()
                 .map(settings -> Boolean.TRUE.equals(settings.getMaintenanceMode()))
                 .orElse(false);
     }
 
     @Transactional(readOnly = true)
     public boolean isAllowNewRegistrations() {
-        return platformSettingsRepository.findById(PlatformSettings.SINGLETON_ID)
+        return readCachedSettings()
                 .map(settings -> settings.getAllowNewRegistrations() == null || settings.getAllowNewRegistrations())
                 .orElse(true);
     }
 
     @Transactional(readOnly = true)
     public PlatformStatusDTO getPublicStatus() {
-        PlatformSettings settings = getOrCreate();
+        PlatformSettings settings = readCachedSettings().orElse(null);
+        if (settings == null) {
+            return PlatformStatusDTO.builder()
+                    .maintenanceMode(false)
+                    .allowNewRegistrations(true)
+                    .maintenanceMessage(null)
+                    .build();
+        }
         return PlatformStatusDTO.builder()
                 .maintenanceMode(Boolean.TRUE.equals(settings.getMaintenanceMode()))
                 .allowNewRegistrations(settings.getAllowNewRegistrations() == null || settings.getAllowNewRegistrations())
@@ -52,15 +61,14 @@ public class PlatformSettingsService {
 
     @Transactional(readOnly = true)
     public double getMonthlyPriceFcfa() {
-        PlatformSettings settings = getOrCreate();
-        Double price = settings.getSubscriptionMonthlyPriceFcfa();
-        if (price == null || price <= 0) {
-            return SubscriptionPricing.DEFAULT_MONTHLY_PRICE_FCFA;
-        }
-        return price;
+        return readCachedSettings()
+                .map(PlatformSettings::getSubscriptionMonthlyPriceFcfa)
+                .filter(price -> price != null && price > 0)
+                .orElse(SubscriptionPricing.DEFAULT_MONTHLY_PRICE_FCFA);
     }
 
     @Transactional
+    @CacheEvict(value = "platformSettings", key = "'singleton'")
     public PlatformSettingsDTO updateSettings(PlatformSettingsDTO dto, String requesterEmail) {
         requireSuperAdmin(requesterEmail);
 
@@ -87,6 +95,12 @@ public class PlatformSettingsService {
                     plan.setPrice(monthlyPrice);
                     subscriptionPlanRepository.save(plan);
                 });
+    }
+
+    @Cacheable(value = "platformSettings", key = "'singleton'")
+    @Transactional(readOnly = true)
+    public java.util.Optional<PlatformSettings> readCachedSettings() {
+        return platformSettingsRepository.findById(PlatformSettings.SINGLETON_ID);
     }
 
     private PlatformSettings getOrCreate() {

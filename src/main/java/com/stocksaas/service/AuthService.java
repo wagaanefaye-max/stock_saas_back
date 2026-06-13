@@ -24,12 +24,9 @@ import com.stocksaas.repository.UserVerificationTokenRepository;
 import com.stocksaas.repository.WarehouseRepository;
 import com.stocksaas.repository.WarehouseStatusRepository;
 import com.stocksaas.security.JwtUtil;
+import com.stocksaas.security.UserDetailsCacheEvictor;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,10 +53,10 @@ public class AuthService {
     private final WarehouseStatusRepository warehouseStatusRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
-    private final AuthenticationManager authenticationManager;
     private final EmailService emailService;
     private final SubscriptionService subscriptionService;
     private final PlatformSettingsService platformSettingsService;
+    private final UserDetailsCacheEvictor userDetailsCacheEvictor;
     
     /**
      * Domaines d'emails jetables à refuser (yopmail, mailinator, etc.).
@@ -101,16 +98,9 @@ public class AuthService {
             }
         }
 
-        Authentication authentication;
-        try {
-            authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
-            );
-        } catch (BadCredentialsException e) {
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw registerFailedLoginAttempt(user);
         }
-
-        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
 
         resetLoginLock(user);
         user.setLastLogin(LocalDateTime.now());
@@ -135,7 +125,7 @@ public class AuthService {
                 .companyId(user.getCompany() != null ? user.getCompany().getId() : null)
                 .companyName(user.getCompany() != null ? user.getCompany().getName() : null)
                 .build();
-        subscriptionService.enrichAuthResponse(response, user);
+        subscriptionService.enrichAuthResponseLight(response, user);
         return response;
     }
     
@@ -360,6 +350,7 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setStatus("Actif");
         userRepository.save(user);
+        userDetailsCacheEvictor.evict(user.getEmail());
         
         // Marquer le token comme utilisé
         verificationTokenRepository.markAsUsed(request.getToken());
@@ -455,6 +446,7 @@ public class AuthService {
             user.setLockedUntil(null);
             user.setFailedLoginAttempts(0);
             userRepository.save(user);
+            userDetailsCacheEvictor.evict(user.getEmail());
         }
     }
 
@@ -472,10 +464,12 @@ public class AuthService {
             LocalDateTime lockedUntil = LocalDateTime.now().plusMinutes(LOGIN_LOCK_MINUTES);
             user.setLockedUntil(lockedUntil);
             userRepository.save(user);
+            userDetailsCacheEvictor.evict(user.getEmail());
             return new AccountLockedException(buildLockoutMessage(lockedUntil), lockedUntil);
         }
 
         userRepository.save(user);
+        userDetailsCacheEvictor.evict(user.getEmail());
         int remaining = MAX_FAILED_LOGIN_ATTEMPTS - attempts;
         return new BadCredentialsException(
                 "Email ou mot de passe incorrect. " + remaining + " tentative(s) restante(s) avant blocage.");

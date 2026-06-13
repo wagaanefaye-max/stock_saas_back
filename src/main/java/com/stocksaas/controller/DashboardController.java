@@ -5,6 +5,7 @@ import com.stocksaas.dto.SuperAdminDashboardStatsDTO;
 import com.stocksaas.model.User;
 import com.stocksaas.repository.UserRepository;
 import com.stocksaas.repository.UserWarehouseRepository;
+import com.stocksaas.security.SecurityAccessService;
 import com.stocksaas.service.DashboardService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -18,7 +19,6 @@ import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Controller pour les statistiques du dashboard
@@ -42,7 +42,7 @@ public class DashboardController {
     
     private final DashboardService dashboardService;
     private final UserRepository userRepository;
-    private final UserWarehouseRepository userWarehouseRepository;
+    private final SecurityAccessService securityAccessService;
     
     @GetMapping("/stats")
     @Operation(summary = "Statistiques du dashboard", description = "Récupère les statistiques du dashboard pour l'utilisateur connecté")
@@ -83,12 +83,7 @@ public class DashboardController {
             List<Long> warehouseIds = null;
             try {
                 if (user.getRole() != null && "GESTIONNAIRE".equals(user.getRole().getCode())) {
-                    warehouseIds = userWarehouseRepository.findAll().stream()
-                            .filter(uw -> uw.getUser() != null && uw.getUser().getId() != null && 
-                                       uw.getUser().getId().equals(user.getId()))
-                            .filter(uw -> uw.getWarehouse() != null && uw.getWarehouse().getId() != null)
-                            .map(uw -> uw.getWarehouse().getId())
-                            .collect(Collectors.toList());
+                    warehouseIds = securityAccessService.getAssignedWarehouseIds(user);
                 }
             } catch (Exception e) {
                 log.warn("Erreur lors de la récupération des entrepôts assignés", e);

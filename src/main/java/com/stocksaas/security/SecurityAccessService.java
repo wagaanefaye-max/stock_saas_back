@@ -11,7 +11,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Contrôles d'accès centralisés (rôles, isolation par entreprise).
@@ -101,11 +100,10 @@ public class SecurityAccessService {
     }
 
     public List<Long> getAssignedWarehouseIds(User user) {
-        return userWarehouseRepository.findAll().stream()
-                .filter(uw -> uw.getUser() != null && user.getId().equals(uw.getUser().getId()))
-                .filter(uw -> uw.getWarehouse() != null && uw.getWarehouse().getId() != null)
-                .map(uw -> uw.getWarehouse().getId())
-                .collect(Collectors.toList());
+        if (user == null || user.getId() == null) {
+            return List.of();
+        }
+        return userWarehouseRepository.findWarehouseIdsByUserId(user.getId());
     }
 
     public void assertWarehouseAccessible(User user, Long warehouseId) {

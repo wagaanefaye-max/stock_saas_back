@@ -6,7 +6,7 @@ import com.stocksaas.dto.PageResponse;
 import com.stocksaas.dto.UpdateInventoryLinesRequest;
 import com.stocksaas.model.User;
 import com.stocksaas.repository.UserRepository;
-import com.stocksaas.repository.UserWarehouseRepository;
+import com.stocksaas.security.SecurityAccessService;
 import com.stocksaas.service.InventoryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -20,7 +20,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @Slf4j
 @RestController
@@ -42,7 +41,7 @@ public class InventoryController {
 
     private final InventoryService inventoryService;
     private final UserRepository userRepository;
-    private final UserWarehouseRepository userWarehouseRepository;
+    private final SecurityAccessService securityAccessService;
 
     @GetMapping
     @Operation(summary = "Liste des inventaires", description = "Récupère les inventaires de l'entreprise avec pagination. Filtres optionnels : warehouseId, status.")
@@ -63,11 +62,7 @@ public class InventoryController {
             Long companyId = user.getCompany().getId();
             List<Long> warehouseIds = null;
             if (user.getRole() != null && "GESTIONNAIRE".equals(user.getRole().getCode())) {
-                warehouseIds = userWarehouseRepository.findAll().stream()
-                        .filter(uw -> uw.getUser() != null && uw.getUser().getId().equals(user.getId()))
-                        .filter(uw -> uw.getWarehouse() != null && uw.getWarehouse().getId() != null)
-                        .map(uw -> uw.getWarehouse().getId())
-                        .collect(Collectors.toList());
+                warehouseIds = securityAccessService.getAssignedWarehouseIds(user);
                 if (warehouseIds.isEmpty()) {
                     return ResponseEntity.ok(emptyPage(page, size));
                 }

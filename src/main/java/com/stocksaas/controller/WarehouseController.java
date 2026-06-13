@@ -8,7 +8,6 @@ import com.stocksaas.dto.WarehouseDTO;
 import com.stocksaas.dto.WarehouseDTOForCreatingProduct;
 import com.stocksaas.model.User;
 import com.stocksaas.repository.UserRepository;
-import com.stocksaas.repository.UserWarehouseRepository;
 import com.stocksaas.security.SecurityAccessService;
 import com.stocksaas.service.WarehouseService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -48,7 +47,6 @@ public class WarehouseController {
     
     private final WarehouseService warehouseService;
     private final UserRepository userRepository;
-    private final UserWarehouseRepository userWarehouseRepository;
     private final SecurityAccessService securityAccessService;
     
     @GetMapping
@@ -74,12 +72,7 @@ public class WarehouseController {
             // Récupérer les entrepôts assignés à l'utilisateur (si gestionnaire)
             List<Long> warehouseIds = null;
             if (user.getRole() != null && "GESTIONNAIRE".equals(user.getRole().getCode())) {
-                warehouseIds = userWarehouseRepository.findAll().stream()
-                        .filter(uw -> uw.getUser() != null && uw.getUser().getId() != null && 
-                                   uw.getUser().getId().equals(user.getId()))
-                        .filter(uw -> uw.getWarehouse() != null && uw.getWarehouse().getId() != null)
-                        .map(uw -> uw.getWarehouse().getId())
-                        .collect(Collectors.toList());
+                warehouseIds = securityAccessService.getAssignedWarehouseIds(user);
             }
             
             List<WarehouseDTO> warehouses = warehouseService.getWarehousesByUser(
@@ -117,12 +110,7 @@ public class WarehouseController {
             // Récupérer les entrepôts assignés à l'utilisateur (si gestionnaire)
             List<Long> warehouseIds = null;
             if (user.getRole() != null && "GESTIONNAIRE".equals(user.getRole().getCode())) {
-                warehouseIds = userWarehouseRepository.findAll().stream()
-                        .filter(uw -> uw.getUser() != null && uw.getUser().getId() != null && 
-                                   uw.getUser().getId().equals(user.getId()))
-                        .filter(uw -> uw.getWarehouse() != null && uw.getWarehouse().getId() != null)
-                        .map(uw -> uw.getWarehouse().getId())
-                        .toList();
+                warehouseIds = securityAccessService.getAssignedWarehouseIds(user);
             }
             
             List<WarehouseDTOForCreatingProduct> warehouses = warehouseService.getSimpleWarehousesByUser(
@@ -192,11 +180,7 @@ public class WarehouseController {
             // Récupérer les entrepôts accessibles par l'utilisateur
             List<Long> warehouseIds = null;
             if (user.getRole() != null && "GESTIONNAIRE".equals(user.getRole().getCode())) {
-                warehouseIds = userWarehouseRepository.findAll().stream()
-                        .filter(uw -> uw.getUser() != null && uw.getUser().getId().equals(user.getId()))
-                        .filter(uw -> uw.getWarehouse() != null)
-                        .map(uw -> uw.getWarehouse().getId())
-                        .collect(Collectors.toList());
+                warehouseIds = securityAccessService.getAssignedWarehouseIds(user);
             }
             List<WarehouseDTO> userWarehouses = warehouseService.getWarehousesByUser(companyId, warehouseIds);
             

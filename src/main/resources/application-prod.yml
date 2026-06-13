@@ -6,7 +6,7 @@ spring:
     password: Nevrose1997!!
     driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 25
+      maximum-pool-size: 50
       minimum-idle: 10
       connection-timeout: 30000
       idle-timeout: 600000
@@ -44,10 +44,10 @@ logging:
     root: INFO
     sun:
       rmi: INFO
-    com.stocksaas: DEBUG
+    com.stocksaas: INFO
     org.springframework: INFO
-    org.hibernate.SQL: DEBUG
-    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.hibernate.SQL: WARN
+    org.hibernate.type.descriptor.sql.BasicBinder: WARN
 
 auth:
   cookie:

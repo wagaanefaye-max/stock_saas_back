@@ -36,7 +36,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     /**
      * Trouve un utilisateur par email en ignorant le soft delete
      */
-    @Query("SELECT u FROM User u WHERE u.email = :email AND u.isDeleted = false")
+    @Query("SELECT u FROM User u LEFT JOIN FETCH u.role WHERE u.email = :email AND u.isDeleted = false")
     Optional<User> findByEmailAndNotDeleted(@Param("email") String email);
     
     /**
