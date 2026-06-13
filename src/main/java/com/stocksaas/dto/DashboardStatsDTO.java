@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -29,6 +30,18 @@ public class DashboardStatsDTO {
     
     // Mouvements récents
     private List<RecentMovementDTO> recentMovements;
+
+    // Synthèse factures (évite de charger toutes les factures côté client)
+    private BigDecimal paidRevenue;
+    private BigDecimal pendingRevenue;
+    private Long paidInvoicesCount;
+    private Long draftInvoicesCount;
+    private Long sentInvoicesCount;
+    private Long cancelledInvoicesCount;
+    private List<MonthlySalesData> salesByMonth;
+    private List<InvoiceSummaryDTO> pendingInvoices;
+    private List<InvoiceSummaryDTO> recentInvoices;
+    private List<LowStockProductDTO> lowStockItems;
     
     // Variations (pourcentage ou nombre)
     private String productsChange;
@@ -66,5 +79,40 @@ public class DashboardStatsDTO {
         private String movementType;
         private Long quantity;
         private String warehouseName;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class MonthlySalesData {
+        private String monthKey;
+        private String label;
+        private BigDecimal amount;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class InvoiceSummaryDTO {
+        private Long id;
+        private String invoiceNumber;
+        private String clientName;
+        private BigDecimal total;
+        private String status;
+        private String statusLabel;
+        private String invoiceDate;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class LowStockProductDTO {
+        private Long id;
+        private String name;
+        private BigDecimal stock;
+        private BigDecimal minThreshold;
     }
 }

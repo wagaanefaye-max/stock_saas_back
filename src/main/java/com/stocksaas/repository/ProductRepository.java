@@ -1,6 +1,9 @@
 package com.stocksaas.repository;
 
 import com.stocksaas.model.Product;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -80,4 +83,7 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE Product p SET p.updatedAt = null WHERE p.id = :id")
     void clearUpdatedAt(@Param("id") Long id);
+
+    @EntityGraph(attributePaths = {"stockLevels", "stockLevels.warehouse", "productCategory", "status"})
+    Page<Product> findAll(Specification<Product> spec, Pageable pageable);
 }

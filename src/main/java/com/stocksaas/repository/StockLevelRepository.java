@@ -66,4 +66,19 @@ public interface StockLevelRepository extends JpaRepository<StockLevel, Long> {
             AND sl.quantity <= sl.minThreshold
             """)
     long countDistinctLowStockProductsByCompany(@Param("companyId") Long companyId);
+
+    @Query(value = """
+            SELECT DISTINCT ON (p.id) p.id, p.name, sl.quantity, sl.min_threshold
+            FROM td_stock_levels sl
+            INNER JOIN td_products p ON p.id = sl.product_id
+            INNER JOIN td_warehouses w ON w.id = sl.warehouse_id
+            WHERE p.company_id = :companyId
+            AND p.is_deleted = false
+            AND w.is_deleted = false
+            AND sl.min_threshold > 0
+            AND sl.quantity <= sl.min_threshold
+            ORDER BY p.id, sl.quantity ASC
+            LIMIT 8
+            """, nativeQuery = true)
+    List<Object[]> findLowStockProductsForDashboard(@Param("companyId") Long companyId);
 }

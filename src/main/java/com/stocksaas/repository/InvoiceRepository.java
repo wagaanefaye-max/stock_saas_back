@@ -33,4 +33,34 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
 
     @Query("SELECT i FROM Invoice i WHERE i.company.id = :companyId AND i.isDeleted = false AND i.invoiceNumber = :invoiceNumber")
     Optional<Invoice> findByCompanyIdAndInvoiceNumber(@Param("companyId") Long companyId, @Param("invoiceNumber") String invoiceNumber);
+
+    @Query("""
+            SELECT i.status, COUNT(i), COALESCE(SUM(i.total), 0)
+            FROM Invoice i
+            WHERE i.company.id = :companyId AND i.isDeleted = false
+            GROUP BY i.status
+            """)
+    List<Object[]> summarizeByStatus(@Param("companyId") Long companyId);
+
+    @Query("""
+            SELECT i FROM Invoice i
+            WHERE i.company.id = :companyId AND i.isDeleted = false
+            AND i.status = 'PAID' AND i.invoiceDate >= :since
+            """)
+    List<Invoice> findPaidInvoicesSince(@Param("companyId") Long companyId, @Param("since") LocalDate since);
+
+    @Query("""
+            SELECT i FROM Invoice i LEFT JOIN FETCH i.client
+            WHERE i.company.id = :companyId AND i.isDeleted = false
+            AND i.status IN ('SENT', 'DRAFT')
+            ORDER BY i.invoiceDate DESC, i.id DESC
+            """)
+    List<Invoice> findPendingForDashboard(@Param("companyId") Long companyId, org.springframework.data.domain.Pageable pageable);
+
+    @Query("""
+            SELECT i FROM Invoice i LEFT JOIN FETCH i.client
+            WHERE i.company.id = :companyId AND i.isDeleted = false
+            ORDER BY i.invoiceDate DESC, i.id DESC
+            """)
+    List<Invoice> findRecentForDashboard(@Param("companyId") Long companyId, org.springframework.data.domain.Pageable pageable);
 }

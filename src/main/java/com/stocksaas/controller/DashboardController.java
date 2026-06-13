@@ -15,6 +15,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -67,42 +69,14 @@ public class DashboardController {
             // Si l'utilisateur est SUPER_ADMIN, il n'a pas d'entreprise
             if (user.isSuperAdmin()) {
                 log.debug("Utilisateur SUPER_ADMIN - retour de données vides");
-                DashboardStatsDTO emptyStats = DashboardStatsDTO.builder()
-                        .totalProducts(0L)
-                        .totalWarehouses(0L)
-                        .monthlyMovements(0L)
-                        .alerts(0L)
-                        .activeUsers(0L)
-                        .monthlyMovementsData(java.util.Collections.emptyList())
-                        .productsByCategory(java.util.Collections.emptyList())
-                        .recentMovements(java.util.Collections.emptyList())
-                        .productsChange("0%")
-                        .warehousesChange("0")
-                        .movementsChange("0%")
-                        .alertsChange("0")
-                        .build();
+                DashboardStatsDTO emptyStats = emptyDashboardStats();
                 return ResponseEntity.ok(emptyStats);
             }
             
             Long companyId = user.getCompany() != null ? user.getCompany().getId() : null;
             if (companyId == null) {
                 log.warn("L'utilisateur {} n'a pas d'entreprise associée", email);
-                // Retourner des données vides plutôt qu'une erreur 400
-                DashboardStatsDTO emptyStats = DashboardStatsDTO.builder()
-                        .totalProducts(0L)
-                        .totalWarehouses(0L)
-                        .monthlyMovements(0L)
-                        .alerts(0L)
-                        .activeUsers(0L)
-                        .monthlyMovementsData(java.util.Collections.emptyList())
-                        .productsByCategory(java.util.Collections.emptyList())
-                        .recentMovements(java.util.Collections.emptyList())
-                        .productsChange("0%")
-                        .warehousesChange("0")
-                        .movementsChange("0%")
-                        .alertsChange("0")
-                        .build();
-                return ResponseEntity.ok(emptyStats);
+                return ResponseEntity.ok(emptyDashboardStats());
             }
             
             // Récupérer les entrepôts assignés à l'utilisateur (si gestionnaire)
@@ -126,26 +100,39 @@ public class DashboardController {
             log.error("Erreur lors de la récupération des statistiques du dashboard", e);
             // Retourner un DTO vide plutôt qu'une erreur 500
             try {
-                DashboardStatsDTO emptyStats = DashboardStatsDTO.builder()
-                        .totalProducts(0L)
-                        .totalWarehouses(0L)
-                        .monthlyMovements(0L)
-                        .alerts(0L)
-                        .activeUsers(0L)
-                        .monthlyMovementsData(java.util.Collections.emptyList())
-                        .productsByCategory(java.util.Collections.emptyList())
-                        .recentMovements(java.util.Collections.emptyList())
-                        .productsChange("0%")
-                        .warehousesChange("0")
-                        .movementsChange("0%")
-                        .alertsChange("0")
-                        .build();
-                return ResponseEntity.ok(emptyStats);
+                return ResponseEntity.ok(emptyDashboardStats());
             } catch (Exception ex) {
                 log.error("Erreur lors de la création du DTO vide", ex);
                 return ResponseEntity.status(500).build();
             }
         }
+    }
+
+    private static DashboardStatsDTO emptyDashboardStats() {
+        return DashboardStatsDTO.builder()
+                .totalProducts(0L)
+                .totalWarehouses(0L)
+                .monthlyMovements(0L)
+                .alerts(0L)
+                .activeUsers(0L)
+                .monthlyMovementsData(Collections.emptyList())
+                .productsByCategory(Collections.emptyList())
+                .recentMovements(Collections.emptyList())
+                .paidRevenue(BigDecimal.ZERO)
+                .pendingRevenue(BigDecimal.ZERO)
+                .paidInvoicesCount(0L)
+                .draftInvoicesCount(0L)
+                .sentInvoicesCount(0L)
+                .cancelledInvoicesCount(0L)
+                .salesByMonth(Collections.emptyList())
+                .pendingInvoices(Collections.emptyList())
+                .recentInvoices(Collections.emptyList())
+                .lowStockItems(Collections.emptyList())
+                .productsChange("0%")
+                .warehousesChange("0")
+                .movementsChange("0%")
+                .alertsChange("0")
+                .build();
     }
     
     @GetMapping("/super-admin/stats")

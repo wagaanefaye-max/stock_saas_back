@@ -21,8 +21,9 @@ public class EmailService {
     private String appBaseUrl;
 
     /**
-     * Envoie un email de notification de connexion
+     * Envoie un email de notification de connexion (asynchrone — hors chemin critique du login).
      */
+    @org.springframework.scheduling.annotation.Async
     public void sendLoginNotification(String toEmail, String userName) {
         if (isBlank(toEmail)) {
             return;

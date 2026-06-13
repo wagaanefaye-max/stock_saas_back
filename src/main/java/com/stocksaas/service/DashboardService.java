@@ -4,6 +4,7 @@ import com.stocksaas.dto.DashboardStatsDTO;
 import com.stocksaas.dto.SuperAdminDashboardStatsDTO;
 import com.stocksaas.model.Company;
 import com.stocksaas.model.CompanySubscriptionRecord;
+import com.stocksaas.model.Invoice;
 import com.stocksaas.model.Movement;
 import com.stocksaas.model.Product;
 import com.stocksaas.model.User;
@@ -18,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
@@ -44,6 +46,7 @@ public class DashboardService {
     private final UserWarehouseRepository userWarehouseRepository;
     private final StockLevelRepository stockLevelRepository;
     private final CompanySubscriptionRecordRepository subscriptionRecordRepository;
+    private final InvoiceRepository invoiceRepository;
     
     /**
      * Récupère les statistiques du dashboard pour un utilisateur
@@ -64,12 +67,7 @@ public class DashboardService {
         if (warehouseIds != null && !warehouseIds.isEmpty()) {
             totalWarehouses = (long) warehouseIds.size();
         } else {
-            // Compter tous les entrepôts de l'entreprise non supprimés
-            totalWarehouses = warehouseRepository.findAll().stream()
-                    .filter(w -> w.getCompany() != null && 
-                               w.getCompany().getId().equals(companyId) && 
-                               !w.getIsDeleted())
-                    .count();
+            totalWarehouses = warehouseRepository.countByCompanyIdAndNotDeleted(companyId);
         }
         
         // Compter les mouvements du mois
@@ -114,6 +112,59 @@ public class DashboardService {
         List<DashboardStatsDTO.RecentMovementDTO> recentMovementsDTO = recentMovements.stream()
                 .map(this::mapToRecentMovementDTO)
                 .collect(Collectors.toList());
+
+        // Synthèse factures (requêtes ciblées — pas de chargement de toutes les factures)
+        BigDecimal paidRevenue = BigDecimal.ZERO;
+        BigDecimal pendingRevenue = BigDecimal.ZERO;
+        long paidInvoicesCount = 0L;
+        long draftInvoicesCount = 0L;
+        long sentInvoicesCount = 0L;
+        long cancelledInvoicesCount = 0L;
+        for (Object[] row : invoiceRepository.summarizeByStatus(companyId)) {
+            if (row == null || row.length < 2 || row[0] == null) {
+                continue;
+            }
+            String status = (String) row[0];
+            long count = ((Number) row[1]).longValue();
+            BigDecimal sum = row.length > 2 && row[2] != null
+                    ? (row[2] instanceof BigDecimal bd ? bd : new BigDecimal(row[2].toString()))
+                    : BigDecimal.ZERO;
+            switch (status) {
+                case "PAID" -> {
+                    paidInvoicesCount = count;
+                    paidRevenue = sum;
+                }
+                case "DRAFT" -> draftInvoicesCount = count;
+                case "SENT" -> {
+                    sentInvoicesCount = count;
+                    pendingRevenue = sum;
+                }
+                case "CANCELLED" -> cancelledInvoicesCount = count;
+                default -> { }
+            }
+        }
+
+        LocalDate salesStart = now.minusMonths(5).withDayOfMonth(1);
+        List<DashboardStatsDTO.MonthlySalesData> salesByMonth =
+                buildSalesByMonth(invoiceRepository.findPaidInvoicesSince(companyId, salesStart));
+
+        Pageable invoicePage = PageRequest.of(0, 5);
+        List<DashboardStatsDTO.InvoiceSummaryDTO> pendingInvoices = invoiceRepository
+                .findPendingForDashboard(companyId, invoicePage)
+                .stream()
+                .map(this::mapToInvoiceSummaryDTO)
+                .collect(Collectors.toList());
+        List<DashboardStatsDTO.InvoiceSummaryDTO> recentInvoices = invoiceRepository
+                .findRecentForDashboard(companyId, invoicePage)
+                .stream()
+                .map(this::mapToInvoiceSummaryDTO)
+                .collect(Collectors.toList());
+
+        List<DashboardStatsDTO.LowStockProductDTO> lowStockItems = stockLevelRepository
+                .findLowStockProductsForDashboard(companyId)
+                .stream()
+                .map(this::mapToLowStockProductDTO)
+                .collect(Collectors.toList());
         
         return DashboardStatsDTO.builder()
                 .totalProducts(totalProducts != null ? totalProducts : 0L)
@@ -124,6 +175,16 @@ public class DashboardService {
                 .monthlyMovementsData(monthlyData)
                 .productsByCategory(categoryData)
                 .recentMovements(recentMovementsDTO)
+                .paidRevenue(paidRevenue)
+                .pendingRevenue(pendingRevenue)
+                .paidInvoicesCount(paidInvoicesCount)
+                .draftInvoicesCount(draftInvoicesCount)
+                .sentInvoicesCount(sentInvoicesCount)
+                .cancelledInvoicesCount(cancelledInvoicesCount)
+                .salesByMonth(salesByMonth)
+                .pendingInvoices(pendingInvoices)
+                .recentInvoices(recentInvoices)
+                .lowStockItems(lowStockItems)
                 .productsChange("+12%")
                 .warehousesChange("+2")
                 .movementsChange("+8%")
@@ -501,6 +562,79 @@ public class DashboardService {
                 .quantity(movement.getQuantity() != null ? movement.getQuantity().longValue() : 0L)
                 .warehouseName(movement.getWarehouse() != null ? movement.getWarehouse().getName() : "N/A")
                 .build();
+    }
+
+    private List<DashboardStatsDTO.MonthlySalesData> buildSalesByMonth(List<Invoice> paidInvoices) {
+        Map<String, BigDecimal> monthlyMap = new HashMap<>();
+        LocalDate current = LocalDate.now();
+        DateTimeFormatter labelFormatter = DateTimeFormatter.ofPattern("MM/yy");
+
+        for (int i = 5; i >= 0; i--) {
+            LocalDate monthDate = current.minusMonths(i).withDayOfMonth(1);
+            String monthKey = YearMonth.from(monthDate).toString();
+            monthlyMap.put(monthKey, BigDecimal.ZERO);
+        }
+
+        for (Invoice invoice : paidInvoices) {
+            if (invoice.getInvoiceDate() == null) {
+                continue;
+            }
+            String monthKey = YearMonth.from(invoice.getInvoiceDate()).toString();
+            if (monthlyMap.containsKey(monthKey)) {
+                BigDecimal total = invoice.getTotal() != null ? invoice.getTotal() : BigDecimal.ZERO;
+                monthlyMap.merge(monthKey, total, BigDecimal::add);
+            }
+        }
+
+        List<DashboardStatsDTO.MonthlySalesData> dataList = new ArrayList<>();
+        for (int i = 5; i >= 0; i--) {
+            LocalDate monthDate = current.minusMonths(i).withDayOfMonth(1);
+            String monthKey = YearMonth.from(monthDate).toString();
+            dataList.add(DashboardStatsDTO.MonthlySalesData.builder()
+                    .monthKey(monthKey)
+                    .label(monthDate.format(labelFormatter))
+                    .amount(monthlyMap.getOrDefault(monthKey, BigDecimal.ZERO))
+                    .build());
+        }
+        return dataList;
+    }
+
+    private DashboardStatsDTO.InvoiceSummaryDTO mapToInvoiceSummaryDTO(Invoice invoice) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        return DashboardStatsDTO.InvoiceSummaryDTO.builder()
+                .id(invoice.getId())
+                .invoiceNumber(invoice.getInvoiceNumber())
+                .clientName(invoice.getClient() != null ? invoice.getClient().getName() : null)
+                .total(invoice.getTotal())
+                .status(invoice.getStatus())
+                .statusLabel(invoiceStatusToLabel(invoice.getStatus()))
+                .invoiceDate(invoice.getInvoiceDate() != null ? invoice.getInvoiceDate().format(formatter) : null)
+                .build();
+    }
+
+    private DashboardStatsDTO.LowStockProductDTO mapToLowStockProductDTO(Object[] row) {
+        return DashboardStatsDTO.LowStockProductDTO.builder()
+                .id(row[0] != null ? ((Number) row[0]).longValue() : null)
+                .name(row[1] != null ? row[1].toString() : null)
+                .stock(row[2] != null
+                        ? (row[2] instanceof BigDecimal bd ? bd : new BigDecimal(row[2].toString()))
+                        : BigDecimal.ZERO)
+                .minThreshold(row[3] != null
+                        ? (row[3] instanceof BigDecimal bd ? bd : new BigDecimal(row[3].toString()))
+                        : BigDecimal.ZERO)
+                .build();
+    }
+
+    private static String invoiceStatusToLabel(String status) {
+        if (status == null) {
+            return "";
+        }
+        return switch (status) {
+            case "SENT" -> "Envoyée";
+            case "PAID" -> "Payée";
+            case "CANCELLED" -> "Annulée";
+            default -> "Brouillon";
+        };
     }
     
     private SuperAdminDashboardStatsDTO.RecentCompanyDTO mapToRecentCompanyDTO(Company company) {

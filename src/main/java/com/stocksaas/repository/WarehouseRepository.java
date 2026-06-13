@@ -15,6 +15,9 @@ import java.util.List;
 @Repository
 public interface WarehouseRepository extends JpaRepository<Warehouse, Long> {
     
+    @Query("SELECT COUNT(w) FROM Warehouse w WHERE w.company.id = :companyId AND w.isDeleted = false")
+    Long countByCompanyIdAndNotDeleted(@Param("companyId") Long companyId);
+
     /**
      * Trouve tous les entrepôts non supprimés d'une entreprise
      */
