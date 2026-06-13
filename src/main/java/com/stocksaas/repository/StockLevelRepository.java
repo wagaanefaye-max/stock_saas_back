@@ -20,6 +20,16 @@ public interface StockLevelRepository extends JpaRepository<StockLevel, Long> {
      */
     @Query("SELECT sl FROM StockLevel sl WHERE sl.product.id = :productId AND sl.warehouse.id = :warehouseId")
     Optional<StockLevel> findByProductIdAndWarehouseId(@Param("productId") Long productId, @Param("warehouseId") Long warehouseId);
+
+    @Query("""
+            SELECT sl FROM StockLevel sl
+            WHERE sl.product.id = :productId
+            AND sl.warehouse.id = :warehouseId
+            AND sl.isDeleted = false
+            """)
+    Optional<StockLevel> findActiveByProductIdAndWarehouseId(
+            @Param("productId") Long productId,
+            @Param("warehouseId") Long warehouseId);
     
     /**
      * Trouve tous les niveaux de stock d'un entrepôt (avec produit chargé)
@@ -32,6 +42,15 @@ public interface StockLevelRepository extends JpaRepository<StockLevel, Long> {
      */
     @Query("SELECT sl FROM StockLevel sl JOIN FETCH sl.warehouse w WHERE sl.product.id = :productId")
     List<StockLevel> findByProductIdWithWarehouse(@Param("productId") Long productId);
+
+    @Query("""
+            SELECT sl FROM StockLevel sl
+            JOIN FETCH sl.warehouse w
+            WHERE sl.product.id = :productId
+            AND sl.isDeleted = false
+            AND w.isDeleted = false
+            """)
+    List<StockLevel> findActiveByProductIdWithWarehouse(@Param("productId") Long productId);
 
     /**
      * Nombre d'alertes stock bas : seuil min &gt; 0 et quantité ≤ seuil.

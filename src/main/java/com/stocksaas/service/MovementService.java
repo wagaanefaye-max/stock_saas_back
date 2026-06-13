@@ -79,18 +79,19 @@ public class MovementService {
             throw new RuntimeException("Le type de mouvement n'est pas actif");
         }
         
-        String internalTypeCode = movementType.getCode().toUpperCase();
+        String internalTypeCode = normalizeTypeCode(movementType.getCode());
 
         // Déterminer l'entrepôt source
         Warehouse warehouse;
         if ("TRANSFERT".equals(internalTypeCode) && request.getWarehouseId() == null) {
             // Trouver automatiquement l'entrepôt où le produit a du stock
-            var levels = stockLevelRepository.findByProductIdWithWarehouse(product.getId());
+            var levels = stockLevelRepository.findActiveByProductIdWithWarehouse(product.getId());
             var withStock = levels.stream()
                     .filter(sl -> sl.getQuantity() != null && sl.getQuantity().compareTo(BigDecimal.ZERO) > 0)
                     .toList();
             if (withStock.isEmpty()) {
-                throw new RuntimeException("Aucun stock disponible pour ce produit pour effectuer un transfert");
+                throw new RuntimeException(
+                        "Aucun stock enregistré pour ce produit. Effectuez d'abord une entrée de stock avant un transfert.");
             }
             // Prendre l'entrepôt avec le plus de stock
             StockLevel best = withStock.stream()
@@ -119,7 +120,7 @@ public class MovementService {
                 throw new RuntimeException("L'entrepôt de destination est obligatoire pour un transfert");
             }
             
-            if (request.getDestinationWarehouseId().equals(request.getWarehouseId())) {
+            if (request.getDestinationWarehouseId().equals(warehouse.getId())) {
                 throw new RuntimeException("L'entrepôt source et l'entrepôt de destination doivent être différents");
             }
             
@@ -146,7 +147,7 @@ public class MovementService {
         
         // Vérifier le stock disponible pour les sorties et transferts
         if ("SORTIE".equals(internalTypeCode) || "TRANSFERT".equals(internalTypeCode)) {
-            StockLevel stockLevel = stockLevelRepository.findByProductIdAndWarehouseId(
+            StockLevel stockLevel = stockLevelRepository.findActiveByProductIdAndWarehouseId(
                     request.getProductId(), warehouse.getId())
                     .orElse(null);
             
@@ -170,7 +171,7 @@ public class MovementService {
         
         if ("TRANSFERT".equals(internalTypeCode)) {
             // Vérifier que l'entrepôt de destination est différent de l'entrepôt d'origine
-            if (request.getDestinationWarehouseId().equals(request.getWarehouseId())) {
+            if (request.getDestinationWarehouseId().equals(warehouse.getId())) {
                 throw new RuntimeException("L'entrepôt d'origine et l'entrepôt de destination doivent être différents");
             }
             

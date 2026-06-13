@@ -377,7 +377,7 @@ public class ProductService {
             stockLevelRepository.save(stockLevel);
         }
 
-        return mapToDTO(productRepository.save(product));
+        return mapToDTO(productRepository.findByIdWithStockLevels(id).orElse(product));
     }
     
     /**
@@ -440,23 +440,33 @@ public class ProductService {
         BigDecimal minThreshold = BigDecimal.ZERO;
         boolean lowStock = false;
         if (product.getStockLevels() != null && !product.getStockLevels().isEmpty()) {
-            totalStock = product.getStockLevels().stream()
-                    .map(StockLevel::getQuantity)
+            List<StockLevel> activeLevels = product.getStockLevels().stream()
+                    .filter(level -> !Boolean.TRUE.equals(level.getIsDeleted()))
+                    .filter(level -> level.getWarehouse() != null && !Boolean.TRUE.equals(level.getWarehouse().getIsDeleted()))
+                    .toList();
+            totalStock = activeLevels.stream()
+                    .map(level -> level.getQuantity() != null ? level.getQuantity() : BigDecimal.ZERO)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
-            for (StockLevel level : product.getStockLevels()) {
+            for (StockLevel level : activeLevels) {
                 if (isLowStock(level)) {
                     lowStock = true;
                 }
             }
-            StockLevel first = product.getStockLevels().iterator().next();
-            if (first.getWarehouse() != null) {
-                warehouseId = first.getWarehouse().getId();
-                warehouseName = first.getWarehouse().getName();
+            StockLevel primaryLevel = activeLevels.stream()
+                    .filter(level -> level.getQuantity() != null && level.getQuantity().compareTo(BigDecimal.ZERO) > 0)
+                    .max((a, b) -> a.getQuantity().compareTo(b.getQuantity()))
+                    .orElse(activeLevels.isEmpty() ? null : activeLevels.get(0));
+            if (primaryLevel != null && primaryLevel.getWarehouse() != null) {
+                warehouseId = primaryLevel.getWarehouse().getId();
+                warehouseName = primaryLevel.getWarehouse().getName();
             }
-            if (first.getMinThreshold() != null) {
-                minThreshold = first.getMinThreshold();
+            if (primaryLevel != null && primaryLevel.getMinThreshold() != null) {
+                minThreshold = primaryLevel.getMinThreshold();
             }
         }
+
+        String statusCode = totalStock.compareTo(BigDecimal.ZERO) > 0 ? "En stock" : "Rupture";
+        String statusLabel = totalStock.compareTo(BigDecimal.ZERO) > 0 ? "En stock" : "Rupture de stock";
         
         String ref = product.getReference();
         if (ref == null && product.getId() != null && product.getCreatedAt() != null) {
@@ -478,8 +488,8 @@ public class ProductService {
                 .description(product.getDescription())
                 .price(product.getPrice())
                 .purchasePrice(product.getPurchasePrice())
-                .statusCode(product.getStatus() != null ? product.getStatus().getCode() : null)
-                .statusLabel(product.getStatus() != null ? product.getStatus().getLabel() : null)
+                .statusCode(statusCode)
+                .statusLabel(statusLabel)
                 .warehouseId(warehouseId)
                 .warehouseName(warehouseName)
                 .stock(totalStock)
