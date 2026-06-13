@@ -1,5 +1,6 @@
 package com.stocksaas.controller;
 
+import com.stocksaas.exception.AccountLockedException;
 import com.stocksaas.dto.AuthResponse;
 import com.stocksaas.dto.ForgotPasswordRequest;
 import com.stocksaas.dto.LoginRequest;
@@ -54,8 +55,16 @@ public class AuthenticationController {
             return ResponseEntity.ok()
                     .header(HttpHeaders.SET_COOKIE, authCookieFactory.createTokenCookie(token).toString())
                     .body(response);
+        } catch (AccountLockedException e) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(Map.of(
+                    "message", e.getMessage(),
+                    "lockedUntil", e.getLockedUntil() != null ? e.getLockedUntil().toString() : ""
+            ));
         } catch (org.springframework.security.authentication.BadCredentialsException e) {
-            return ResponseEntity.status(401).body(Map.of("message", "Email ou mot de passe incorrect"));
+            String message = e.getMessage() != null && !e.getMessage().isBlank()
+                    ? e.getMessage()
+                    : "Email ou mot de passe incorrect";
+            return ResponseEntity.status(401).body(Map.of("message", message));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         } catch (Exception e) {

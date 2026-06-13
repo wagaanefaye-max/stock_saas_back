@@ -1,5 +1,6 @@
 package com.stocksaas.service;
 
+import com.stocksaas.exception.AccountLockedException;
 import com.stocksaas.dto.AuthResponse;
 import com.stocksaas.dto.CreateCompanyRequest;
 import com.stocksaas.dto.LoginRequest;
@@ -25,6 +26,7 @@ import com.stocksaas.repository.WarehouseStatusRepository;
 import com.stocksaas.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -32,6 +34,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Set;
 import java.util.UUID;
@@ -73,15 +76,19 @@ public class AuthService {
             "trashmail.com"
     );
 
+    private static final int MAX_FAILED_LOGIN_ATTEMPTS = 5;
+    private static final int LOGIN_LOCK_MINUTES = 5;
+
     /**
      * Authentifie un utilisateur et retourne un token JWT
      */
     public AuthResponse login(LoginRequest request) {
-        // Vérifier d'abord si l'utilisateur existe et a un mot de passe
         User user = userRepository.findByEmailWithCompanyAndRole(request.getEmail())
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
-        
-        // Vérifier si le compte est validé (a un mot de passe)
+
+        clearExpiredLock(user);
+        ensureAccountNotLocked(user);
+
         if (user.getPassword() == null) {
             throw new RuntimeException("Votre compte n'est pas encore activé. Veuillez vérifier votre email et cliquer sur le lien de validation.");
         }
@@ -93,14 +100,19 @@ public class AuthService {
                 );
             }
         }
-        
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
-        );
-        
+
+        Authentication authentication;
+        try {
+            authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
+            );
+        } catch (BadCredentialsException e) {
+            throw registerFailedLoginAttempt(user);
+        }
+
         UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-        
-        // Mettre à jour la date de dernière connexion
+
+        resetLoginLock(user);
         user.setLastLogin(LocalDateTime.now());
         userRepository.save(user);
         
@@ -433,5 +445,56 @@ public class AuthService {
         if (DISPOSABLE_EMAIL_DOMAINS.contains(domain)) {
             throw new RuntimeException("Les adresses e-mail jetables (yopmail, mailinator, etc.) ne sont pas acceptées. Merci d'utiliser une adresse professionnelle.");
         }
+    }
+
+    private void clearExpiredLock(User user) {
+        if (user.getLockedUntil() == null) {
+            return;
+        }
+        if (!user.getLockedUntil().isAfter(LocalDateTime.now())) {
+            user.setLockedUntil(null);
+            user.setFailedLoginAttempts(0);
+            userRepository.save(user);
+        }
+    }
+
+    private void ensureAccountNotLocked(User user) {
+        if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(LocalDateTime.now())) {
+            throw new AccountLockedException(buildLockoutMessage(user.getLockedUntil()), user.getLockedUntil());
+        }
+    }
+
+    private RuntimeException registerFailedLoginAttempt(User user) {
+        int attempts = (user.getFailedLoginAttempts() != null ? user.getFailedLoginAttempts() : 0) + 1;
+        user.setFailedLoginAttempts(attempts);
+
+        if (attempts >= MAX_FAILED_LOGIN_ATTEMPTS) {
+            LocalDateTime lockedUntil = LocalDateTime.now().plusMinutes(LOGIN_LOCK_MINUTES);
+            user.setLockedUntil(lockedUntil);
+            userRepository.save(user);
+            return new AccountLockedException(buildLockoutMessage(lockedUntil), lockedUntil);
+        }
+
+        userRepository.save(user);
+        int remaining = MAX_FAILED_LOGIN_ATTEMPTS - attempts;
+        return new BadCredentialsException(
+                "Email ou mot de passe incorrect. " + remaining + " tentative(s) restante(s) avant blocage.");
+    }
+
+    private void resetLoginLock(User user) {
+        user.setFailedLoginAttempts(0);
+        user.setLockedUntil(null);
+    }
+
+    private String buildLockoutMessage(LocalDateTime lockedUntil) {
+        Duration remaining = Duration.between(LocalDateTime.now(), lockedUntil);
+        long minutes = Math.max(0, remaining.toMinutes());
+        long seconds = Math.max(0, remaining.minusMinutes(minutes).getSeconds());
+        if (minutes > 0) {
+            return "Compte temporairement bloqué après 5 tentatives incorrectes. Réessayez dans "
+                    + minutes + " min " + seconds + " s.";
+        }
+        return "Compte temporairement bloqué après 5 tentatives incorrectes. Réessayez dans "
+                + seconds + " s.";
     }
 }

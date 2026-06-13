@@ -1,5 +1,6 @@
 package com.stocksaas.exception;
 
+import com.stocksaas.exception.AccountLockedException;
 import com.stocksaas.exception.ForbiddenAccessException;
 import com.stocksaas.exception.ProofNotFoundException;
 import com.stocksaas.exception.SubscriptionReadOnlyException;
@@ -62,6 +63,17 @@ public class GlobalExceptionHandler {
         response.put("error", "SubscriptionReadOnly");
         response.put("readOnly", true);
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+    }
+
+    @ExceptionHandler(AccountLockedException.class)
+    public ResponseEntity<Map<String, Object>> handleAccountLocked(AccountLockedException ex) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("message", ex.getMessage());
+        response.put("error", "AccountLocked");
+        if (ex.getLockedUntil() != null) {
+            response.put("lockedUntil", ex.getLockedUntil().toString());
+        }
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(response);
     }
 
     @ExceptionHandler(ProofNotFoundException.class)
