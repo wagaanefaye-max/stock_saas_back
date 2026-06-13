@@ -313,58 +313,90 @@ public class DashboardService {
         } else {
             results = movementRepository.findMonthlyMovementsByCompany(companyId, startDate);
         }
-        
-        // Créer un map pour stocker les données par mois
-        java.util.Map<String, DashboardStatsDTO.MonthlyMovementData> dataMap = new java.util.HashMap<>();
-        
-        // Initialiser les 6 derniers mois
+
         String[] monthNames = {"Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"};
-        LocalDate current = LocalDate.now();
-        for (int i = 0; i < 6; i++) {
-            LocalDate monthDate = current.minusMonths(i);
-            String monthKey = monthNames[monthDate.getMonthValue() - 1];
+        YearMonth currentMonth = YearMonth.now();
+        Map<String, DashboardStatsDTO.MonthlyMovementData> dataMap = new java.util.LinkedHashMap<>();
+
+        for (int i = 5; i >= 0; i--) {
+            YearMonth ym = currentMonth.minusMonths(i);
+            String monthKey = ym.toString();
+            String monthLabel = monthNames[ym.getMonthValue() - 1];
             dataMap.put(monthKey, DashboardStatsDTO.MonthlyMovementData.builder()
-                    .month(monthKey)
+                    .month(monthLabel)
                     .entries(0L)
                     .exits(0L)
+                    .transfers(0L)
+                    .adjustments(0L)
                     .build());
         }
-        
-        // Remplir avec les données réelles
+
         for (Object[] result : results) {
-            String month = (String) result[0];
-            String typeCode = (String) result[1];
-            Long count = ((Number) result[2]).longValue();
-            
-            DashboardStatsDTO.MonthlyMovementData data = dataMap.getOrDefault(month, 
-                    DashboardStatsDTO.MonthlyMovementData.builder()
-                            .month(month)
-                            .entries(0L)
-                            .exits(0L)
-                            .build());
-            
-            if ("ENTREE".equals(typeCode)) {
-                data.setEntries(count);
-            } else if ("SORTIE".equals(typeCode)) {
-                data.setExits(count);
+            int year = ((Number) result[0]).intValue();
+            int month = ((Number) result[1]).intValue();
+            String typeCode = (String) result[2];
+            long count = ((Number) result[3]).longValue();
+            String monthKey = YearMonth.of(year, month).toString();
+
+            DashboardStatsDTO.MonthlyMovementData data = dataMap.get(monthKey);
+            if (data == null) {
+                continue;
             }
-            
-            dataMap.put(month, data);
+            addMovementCount(data, typeCode, count);
         }
-        
-        // Retourner les 6 derniers mois dans l'ordre
-        List<DashboardStatsDTO.MonthlyMovementData> dataList = new ArrayList<>();
-        for (int i = 5; i >= 0; i--) {
-            LocalDate monthDate = current.minusMonths(i);
-            String monthKey = monthNames[monthDate.getMonthValue() - 1];
-            dataList.add(dataMap.getOrDefault(monthKey, DashboardStatsDTO.MonthlyMovementData.builder()
-                    .month(monthKey)
-                    .entries(0L)
-                    .exits(0L)
-                    .build()));
+
+        return new ArrayList<>(dataMap.values());
+    }
+
+    private static void addMovementCount(DashboardStatsDTO.MonthlyMovementData data, String typeCode, long count) {
+        String normalized = normalizeMovementTypeCode(typeCode);
+        if (normalized == null) {
+            return;
         }
-        
-        return dataList;
+        switch (normalized) {
+            case "ENTREE" -> data.setEntries(safeAdd(data.getEntries(), count));
+            case "SORTIE" -> data.setExits(safeAdd(data.getExits(), count));
+            case "TRANSFERT" -> data.setTransfers(safeAdd(data.getTransfers(), count));
+            case "AJUSTEMENT" -> data.setAdjustments(safeAdd(data.getAdjustments(), count));
+            default -> { }
+        }
+    }
+
+    private static long safeAdd(Long current, long count) {
+        return (current != null ? current : 0L) + count;
+    }
+
+    private static String normalizeMovementTypeCode(String code) {
+        if (code == null || code.isBlank()) {
+            return null;
+        }
+        String trimmed = code.trim();
+        String upper = trimmed.toUpperCase();
+        if ("ENTREE".equals(upper) || "ENTRÉE".equals(upper)) {
+            return "ENTREE";
+        }
+        if ("SORTIE".equals(upper)) {
+            return "SORTIE";
+        }
+        if ("TRANSFERT".equals(upper)) {
+            return "TRANSFERT";
+        }
+        if ("AJUSTEMENT".equals(upper)) {
+            return "AJUSTEMENT";
+        }
+        if ("Entrée".equalsIgnoreCase(trimmed)) {
+            return "ENTREE";
+        }
+        if ("Sortie".equalsIgnoreCase(trimmed)) {
+            return "SORTIE";
+        }
+        if ("Transfert".equalsIgnoreCase(trimmed)) {
+            return "TRANSFERT";
+        }
+        if ("Ajustement".equalsIgnoreCase(trimmed)) {
+            return "AJUSTEMENT";
+        }
+        return null;
     }
     
     private List<DashboardStatsDTO.CategoryData> getProductsByCategory(Long companyId, List<Long> warehouseIds) {

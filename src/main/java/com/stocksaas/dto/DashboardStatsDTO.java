@@ -57,6 +57,8 @@ public class DashboardStatsDTO {
         private String month;
         private Long entries;
         private Long exits;
+        private Long transfers;
+        private Long adjustments;
     }
     
     @Data

@@ -48,29 +48,31 @@ public interface MovementRepository extends JpaRepository<Movement, Long>, JpaSp
     /**
      * Récupère les mouvements des 6 derniers mois groupés par mois et type
      */
-    @Query(value = "SELECT TO_CHAR(m.date, 'Mon') as month, " +
+    @Query(value = "SELECT CAST(EXTRACT(YEAR FROM m.date) AS INTEGER) as year, " +
+           "CAST(EXTRACT(MONTH FROM m.date) AS INTEGER) as month, " +
            "m.type_code as typeCode, COUNT(m.id) as count " +
            "FROM td_movements m " +
            "WHERE m.company_id = :companyId " +
            "AND m.date >= :startDate " +
            "AND m.is_deleted = false " +
-           "GROUP BY TO_CHAR(m.date, 'Mon'), m.type_code, EXTRACT(YEAR FROM m.date), EXTRACT(MONTH FROM m.date) " +
-           "ORDER BY EXTRACT(YEAR FROM m.date) DESC, EXTRACT(MONTH FROM m.date) DESC", nativeQuery = true)
+           "GROUP BY EXTRACT(YEAR FROM m.date), EXTRACT(MONTH FROM m.date), m.type_code " +
+           "ORDER BY year DESC, month DESC", nativeQuery = true)
     List<Object[]> findMonthlyMovementsByCompany(@Param("companyId") Long companyId, 
                                                   @Param("startDate") LocalDate startDate);
     
     /**
      * Récupère les mouvements des 6 derniers mois groupés par mois et type pour des entrepôts spécifiques
      */
-    @Query(value = "SELECT TO_CHAR(m.date, 'Mon') as month, " +
+    @Query(value = "SELECT CAST(EXTRACT(YEAR FROM m.date) AS INTEGER) as year, " +
+           "CAST(EXTRACT(MONTH FROM m.date) AS INTEGER) as month, " +
            "m.type_code as typeCode, COUNT(m.id) as count " +
            "FROM td_movements m " +
            "WHERE m.company_id = :companyId " +
            "AND m.warehouse_id IN :warehouseIds " +
            "AND m.date >= :startDate " +
            "AND m.is_deleted = false " +
-           "GROUP BY TO_CHAR(m.date, 'Mon'), m.type_code, EXTRACT(YEAR FROM m.date), EXTRACT(MONTH FROM m.date) " +
-           "ORDER BY EXTRACT(YEAR FROM m.date) DESC, EXTRACT(MONTH FROM m.date) DESC", nativeQuery = true)
+           "GROUP BY EXTRACT(YEAR FROM m.date), EXTRACT(MONTH FROM m.date), m.type_code " +
+           "ORDER BY year DESC, month DESC", nativeQuery = true)
     List<Object[]> findMonthlyMovementsByCompanyAndWarehouses(@Param("companyId") Long companyId,
                                                                @Param("warehouseIds") List<Long> warehouseIds,
                                                                @Param("startDate") LocalDate startDate);

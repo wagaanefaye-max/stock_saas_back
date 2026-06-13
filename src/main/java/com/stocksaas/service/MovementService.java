@@ -365,9 +365,9 @@ public class MovementService {
             }
 
             if (typeCode != null && !typeCode.isBlank() && !"ALL".equalsIgnoreCase(typeCode.trim())) {
-                String dbTypeCode = toDatabaseTypeCode(normalizeTypeCode(typeCode.trim()));
-                if (dbTypeCode != null) {
-                    predicates.add(cb.equal(root.get("type").get("code"), dbTypeCode));
+                List<String> matchingCodes = matchingTypeCodes(normalizeTypeCode(typeCode.trim()));
+                if (!matchingCodes.isEmpty()) {
+                    predicates.add(root.get("type").get("code").in(matchingCodes));
                 }
             }
 
@@ -383,6 +383,19 @@ public class MovementService {
 
             query.distinct(true);
             return cb.and(predicates.toArray(new Predicate[0]));
+        };
+    }
+
+    private static List<String> matchingTypeCodes(String normalized) {
+        if (normalized == null) {
+            return List.of();
+        }
+        return switch (normalized) {
+            case "ENTREE" -> List.of("ENTREE", "Entrée", "ENTRÉE");
+            case "SORTIE" -> List.of("SORTIE", "Sortie");
+            case "TRANSFERT" -> List.of("TRANSFERT", "Transfert");
+            case "AJUSTEMENT" -> List.of("AJUSTEMENT", "Ajustement");
+            default -> List.of(normalized);
         };
     }
 
