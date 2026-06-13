@@ -60,6 +60,15 @@ app:
       interval-minutes: ${MAIL_RETRY_INTERVAL_MINUTES:10}
       max-attempts: ${MAIL_RETRY_MAX_ATTEMPTS:144}
       batch-size: ${MAIL_RETRY_BATCH_SIZE:50}
+  notifications:
+    low-stock:
+      enabled: ${NOTIF_LOW_STOCK_ENABLED:true}
+      # Tous les jours à 08:15
+      cron: ${NOTIF_LOW_STOCK_CRON:0 15 8 * * *}
+    weekly-report:
+      enabled: ${NOTIF_WEEKLY_REPORT_ENABLED:true}
+      # Chaque lundi à 08:30
+      cron: ${NOTIF_WEEKLY_REPORT_CRON:0 30 8 * * MON}
 
 # Désactivation complète de JMX et RMI
 management:

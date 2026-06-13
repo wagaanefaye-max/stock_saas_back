@@ -63,4 +63,13 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
             ORDER BY i.invoiceDate DESC, i.id DESC
             """)
     List<Invoice> findRecentForDashboard(@Param("companyId") Long companyId, org.springframework.data.domain.Pageable pageable);
+
+    @Query("""
+            SELECT COUNT(i) FROM Invoice i
+            WHERE i.company.id = :companyId AND i.isDeleted = false
+            AND i.invoiceDate >= :startDate AND i.invoiceDate <= :endDate
+            """)
+    long countByCompanyIdAndInvoiceDateRange(@Param("companyId") Long companyId,
+                                             @Param("startDate") LocalDate startDate,
+                                             @Param("endDate") LocalDate endDate);
 }

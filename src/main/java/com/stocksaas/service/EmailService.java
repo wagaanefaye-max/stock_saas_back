@@ -209,6 +209,111 @@ public class EmailService {
         );
     }
 
+    /**
+     * Alerte stock bas (digest quotidien).
+     */
+    @org.springframework.scheduling.annotation.Async
+    public void sendLowStockAlert(
+            String toEmail,
+            String recipientName,
+            String companyName,
+            long totalAlerts,
+            java.util.List<String> productLines,
+            String productsUrl
+    ) {
+        if (isBlank(toEmail)) {
+            return;
+        }
+        emailOutboxService.enqueueTextEmail(
+                toEmail.trim(),
+                "Alerte stock bas — " + companyName + " - Stock SaaS",
+                buildLowStockAlertContent(recipientName, companyName, totalAlerts, productLines, productsUrl),
+                "LOW_STOCK_ALERT"
+        );
+    }
+
+    /**
+     * Notification à chaque entrée ou sortie de stock.
+     */
+    @org.springframework.scheduling.annotation.Async
+    public void sendStockMovementNotification(
+            String toEmail,
+            String recipientName,
+            String companyName,
+            String movementTypeLabel,
+            String productName,
+            String warehouseName,
+            String quantity,
+            String movementDate,
+            String performedBy,
+            String movementsUrl
+    ) {
+        if (isBlank(toEmail)) {
+            return;
+        }
+        emailOutboxService.enqueueTextEmail(
+                toEmail.trim(),
+                movementTypeLabel + " de stock — " + productName + " - Stock SaaS",
+                buildMovementNotificationContent(
+                        recipientName,
+                        companyName,
+                        movementTypeLabel,
+                        productName,
+                        warehouseName,
+                        quantity,
+                        movementDate,
+                        performedBy,
+                        movementsUrl
+                ),
+                "STOCK_MOVEMENT"
+        );
+    }
+
+    /**
+     * Résumé hebdomadaire d'activité stock.
+     */
+    @org.springframework.scheduling.annotation.Async
+    public void sendWeeklyStockReport(
+            String toEmail,
+            String recipientName,
+            String companyName,
+            String periodLabel,
+            long productCount,
+            long warehouseCount,
+            long totalMovements,
+            long entries,
+            long exits,
+            long transfers,
+            long adjustments,
+            long lowStockCount,
+            long invoiceCount,
+            String dashboardUrl
+    ) {
+        if (isBlank(toEmail)) {
+            return;
+        }
+        emailOutboxService.enqueueTextEmail(
+                toEmail.trim(),
+                "Résumé hebdomadaire — " + companyName + " - Stock SaaS",
+                buildWeeklyReportContent(
+                        recipientName,
+                        companyName,
+                        periodLabel,
+                        productCount,
+                        warehouseCount,
+                        totalMovements,
+                        entries,
+                        exits,
+                        transfers,
+                        adjustments,
+                        lowStockCount,
+                        invoiceCount,
+                        dashboardUrl
+                ),
+                "WEEKLY_STOCK_REPORT"
+        );
+    }
+
     private static boolean isBlank(String value) {
         return value == null || value.isBlank();
     }
@@ -361,6 +466,95 @@ public class EmailService {
                 + "depuis la page Abonnement :\n\n"
                 + subscriptionsUrl + "\n\n"
                 + "Pour toute question, contactez le support Stock SaaS.\n\n"
+                + "Cordialement,\n"
+                + "L'équipe Stock SaaS";
+    }
+
+    private String buildLowStockAlertContent(
+            String recipientName,
+            String companyName,
+            long totalAlerts,
+            java.util.List<String> productLines,
+            String productsUrl
+    ) {
+        StringBuilder body = new StringBuilder();
+        body.append("Bonjour ").append(recipientName != null && !recipientName.isBlank() ? recipientName : "Administrateur").append(",\n\n")
+                .append("Des produits sont en stock bas pour l'entreprise ").append(companyName).append(".\n\n")
+                .append("Nombre de produits concernés : ").append(totalAlerts).append("\n\n");
+        if (productLines != null && !productLines.isEmpty()) {
+            body.append("Détail (extrait) :\n");
+            for (String line : productLines) {
+                body.append(line).append("\n");
+            }
+            if (totalAlerts > productLines.size()) {
+                body.append("… et ").append(totalAlerts - productLines.size()).append(" autre(s) produit(s).\n");
+            }
+            body.append("\n");
+        }
+        body.append("Consultez vos produits :\n\n")
+                .append(productsUrl).append("\n\n")
+                .append("Cordialement,\n")
+                .append("L'équipe Stock SaaS");
+        return body.toString();
+    }
+
+    private String buildMovementNotificationContent(
+            String recipientName,
+            String companyName,
+            String movementTypeLabel,
+            String productName,
+            String warehouseName,
+            String quantity,
+            String movementDate,
+            String performedBy,
+            String movementsUrl
+    ) {
+        return "Bonjour " + (recipientName != null && !recipientName.isBlank() ? recipientName : "Administrateur") + ",\n\n"
+                + "Un mouvement de stock vient d'être enregistré pour " + companyName + ".\n\n"
+                + "Type : " + movementTypeLabel + "\n"
+                + "Produit : " + productName + "\n"
+                + "Entrepôt : " + warehouseName + "\n"
+                + "Quantité : " + quantity + "\n"
+                + "Date : " + movementDate + "\n"
+                + "Saisi par : " + performedBy + "\n\n"
+                + "Voir l'historique des mouvements :\n\n"
+                + movementsUrl + "\n\n"
+                + "Cordialement,\n"
+                + "L'équipe Stock SaaS";
+    }
+
+    private String buildWeeklyReportContent(
+            String recipientName,
+            String companyName,
+            String periodLabel,
+            long productCount,
+            long warehouseCount,
+            long totalMovements,
+            long entries,
+            long exits,
+            long transfers,
+            long adjustments,
+            long lowStockCount,
+            long invoiceCount,
+            String dashboardUrl
+    ) {
+        return "Bonjour " + (recipientName != null && !recipientName.isBlank() ? recipientName : "Administrateur") + ",\n\n"
+                + "Voici le résumé hebdomadaire de " + companyName + " sur Stock SaaS.\n\n"
+                + "Période : " + periodLabel + "\n\n"
+                + "—— Inventaire ——\n"
+                + "Produits actifs : " + productCount + "\n"
+                + "Entrepôts : " + warehouseCount + "\n"
+                + "Produits en stock bas : " + lowStockCount + "\n\n"
+                + "—— Mouvements (7 derniers jours) ——\n"
+                + "Total : " + totalMovements + "\n"
+                + "  • Entrées : " + entries + "\n"
+                + "  • Sorties : " + exits + "\n"
+                + "  • Transferts : " + transfers + "\n"
+                + "  • Ajustements : " + adjustments + "\n\n"
+                + "—— Facturation ——\n"
+                + "Factures créées : " + invoiceCount + "\n\n"
+                + "Tableau de bord :\n\n"
+                + dashboardUrl + "\n\n"
                 + "Cordialement,\n"
                 + "L'équipe Stock SaaS";
     }

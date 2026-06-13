@@ -95,4 +95,21 @@ public interface MovementRepository extends JpaRepository<Movement, Long>, JpaSp
            "ORDER BY m.createdAt DESC")
     List<Movement> findByCompanyIdAndWarehouseIds(@Param("companyId") Long companyId,
                                                   @Param("warehouseIds") List<Long> warehouseIds);
+
+    @Query("SELECT m FROM Movement m JOIN FETCH m.company JOIN FETCH m.product JOIN FETCH m.warehouse " +
+           "JOIN FETCH m.type JOIN FETCH m.user LEFT JOIN FETCH m.destinationWarehouse WHERE m.id = :id")
+    java.util.Optional<Movement> findByIdWithDetails(@Param("id") Long id);
+
+    @Query(value = """
+            SELECT m.type_code, COUNT(m.id)
+            FROM td_movements m
+            WHERE m.company_id = :companyId
+            AND m.date >= :startDate
+            AND m.date <= :endDate
+            AND m.is_deleted = false
+            GROUP BY m.type_code
+            """, nativeQuery = true)
+    List<Object[]> countMovementsByTypeInRange(@Param("companyId") Long companyId,
+                                               @Param("startDate") LocalDate startDate,
+                                               @Param("endDate") LocalDate endDate);
 }

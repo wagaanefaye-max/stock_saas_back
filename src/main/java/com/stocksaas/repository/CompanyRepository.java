@@ -144,4 +144,11 @@ public interface CompanyRepository extends JpaRepository<Company, Long> {
            "AND c.subscriptionStatus IN ('TRIAL', 'ACTIVE')")
     List<Company> findCompaniesWithTrialOrActiveSubscription();
 
+    @Query("SELECT c FROM Company c WHERE c.isDeleted = false " +
+           "AND (c.notifLowStock = true OR c.notifLowStock IS NULL)")
+    List<Company> findActiveWithLowStockNotificationsEnabled();
+
+    @Query("SELECT c FROM Company c WHERE c.isDeleted = false AND c.notifReports = true")
+    List<Company> findActiveWithWeeklyReportEnabled();
+
 }

@@ -16,6 +16,9 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.context.ApplicationEventPublisher;
+import com.stocksaas.event.MovementCreatedEvent;
+
 import jakarta.persistence.criteria.Predicate;
 
 import java.math.BigDecimal;
@@ -39,6 +42,7 @@ public class MovementService {
     private final MovementTypeRepository movementTypeRepository;
     private final StockLevelRepository stockLevelRepository;
     private final ProductStatusRepository productStatusRepository;
+    private final ApplicationEventPublisher applicationEventPublisher;
     
     /**
      * Crée un nouveau mouvement de stock
@@ -185,7 +189,9 @@ public class MovementService {
         
         // Mettre à jour manuellement les niveaux de stock pour plus de contrôle
         updateStockLevels(savedMovement);
-        
+
+        applicationEventPublisher.publishEvent(new MovementCreatedEvent(savedMovement.getId()));
+
         return mapToDTO(savedMovement);
     }
     
