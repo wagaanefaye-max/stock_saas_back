@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * DTO pour représenter un produit
@@ -33,6 +34,8 @@ public class ProductDTO {
     private Long warehouseId;
     private String warehouseName;
     private BigDecimal stock;
+    /** Détail du stock par entrepôt (quantité > 0 ou seuil défini) */
+    private List<ProductWarehouseStockDTO> warehouseStocks;
     /** Seuil minimum (entrepôt principal affiché) */
     private BigDecimal minThreshold;
     /** Vrai si au moins un entrepôt a quantité ≤ seuil min (> 0) */

@@ -4,6 +4,7 @@ import com.stocksaas.exception.ForbiddenAccessException;
 import com.stocksaas.dto.CreateProductRequest;
 import com.stocksaas.dto.PageResponse;
 import com.stocksaas.dto.ProductDTO;
+import com.stocksaas.dto.ProductWarehouseStockDTO;
 import com.stocksaas.dto.UpdateProductRequest;
 import com.stocksaas.model.*;
 import com.stocksaas.repository.ProductCategoryRepository;
@@ -439,6 +440,7 @@ public class ProductService {
         String warehouseName = null;
         BigDecimal minThreshold = BigDecimal.ZERO;
         boolean lowStock = false;
+        List<ProductWarehouseStockDTO> warehouseStocks = new ArrayList<>();
         if (product.getStockLevels() != null && !product.getStockLevels().isEmpty()) {
             List<StockLevel> activeLevels = product.getStockLevels().stream()
                     .filter(level -> !Boolean.TRUE.equals(level.getIsDeleted()))
@@ -451,7 +453,19 @@ public class ProductService {
                 if (isLowStock(level)) {
                     lowStock = true;
                 }
+                BigDecimal qty = level.getQuantity() != null ? level.getQuantity() : BigDecimal.ZERO;
+                BigDecimal threshold = level.getMinThreshold() != null ? level.getMinThreshold() : BigDecimal.ZERO;
+                if (qty.compareTo(BigDecimal.ZERO) > 0 || threshold.compareTo(BigDecimal.ZERO) > 0) {
+                    warehouseStocks.add(ProductWarehouseStockDTO.builder()
+                            .warehouseId(level.getWarehouse().getId())
+                            .warehouseName(level.getWarehouse().getName())
+                            .quantity(qty)
+                            .minThreshold(threshold)
+                            .lowStock(isLowStock(level))
+                            .build());
+                }
             }
+            warehouseStocks.sort((a, b) -> b.getQuantity().compareTo(a.getQuantity()));
             StockLevel primaryLevel = activeLevels.stream()
                     .filter(level -> level.getQuantity() != null && level.getQuantity().compareTo(BigDecimal.ZERO) > 0)
                     .max((a, b) -> a.getQuantity().compareTo(b.getQuantity()))
@@ -493,6 +507,7 @@ public class ProductService {
                 .warehouseId(warehouseId)
                 .warehouseName(warehouseName)
                 .stock(totalStock)
+                .warehouseStocks(warehouseStocks)
                 .minThreshold(minThreshold)
                 .lowStock(lowStock)
                 .createdAt(product.getCreatedAt())
