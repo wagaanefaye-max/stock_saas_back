@@ -198,27 +198,54 @@ public class DashboardService {
      */
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public SuperAdminDashboardStatsDTO getSuperAdminDashboardStats() {
-        // Compter les entreprises actives
+        YearMonth currentMonth = YearMonth.now();
+        YearMonth previousMonth = currentMonth.minusMonths(1);
+        LocalDateTime thisMonthStart = currentMonth.atDay(1).atStartOfDay();
+        LocalDateTime nextMonthStart = currentMonth.plusMonths(1).atDay(1).atStartOfDay();
+        LocalDateTime lastMonthStart = previousMonth.atDay(1).atStartOfDay();
+
         Long activeCompanies = 0L;
         try {
             activeCompanies = countActiveCompanies();
         } catch (Exception e) {
             log.warn("Erreur lors du comptage des entreprises actives", e);
         }
-        
-        // Compter les utilisateurs totaux (sauf SUPER_ADMIN)
+
         Long totalUsers = 0L;
         try {
             totalUsers = countTotalUsers();
         } catch (Exception e) {
             log.warn("Erreur lors du comptage des utilisateurs", e);
         }
-        
-        // Pour l'instant, revenus et tickets sont des valeurs de base
-        String monthlyRevenue = "0 FCFA";
+
+        double revenueThisMonth = 0D;
+        double revenueLastMonth = 0D;
         Long supportTickets = 0L;
-        
-        // Récupérer les données réelles pour les graphiques
+        long newCompaniesThisMonth = 0L;
+        long newUsersThisMonth = 0L;
+        long newPendingThisMonth = 0L;
+        long newPendingLastMonth = 0L;
+        try {
+            revenueThisMonth = safeAmount(subscriptionRecordRepository.sumApprovedAmountBetween(thisMonthStart, nextMonthStart));
+            revenueLastMonth = safeAmount(subscriptionRecordRepository.sumApprovedAmountBetween(lastMonthStart, thisMonthStart));
+            supportTickets = subscriptionRecordRepository.countByRequestStatusAndIsDeletedFalse(
+                    SubscriptionRequestStatusCode.PENDING);
+            newCompaniesThisMonth = companyRepository.countCreatedBetween(thisMonthStart, nextMonthStart);
+            newUsersThisMonth = userRepository.countNonSuperAdminCreatedBetween(thisMonthStart, nextMonthStart);
+            newPendingThisMonth = subscriptionRecordRepository.countByRequestStatusAndCreatedBetween(
+                    SubscriptionRequestStatusCode.PENDING, thisMonthStart, nextMonthStart);
+            newPendingLastMonth = subscriptionRecordRepository.countByRequestStatusAndCreatedBetween(
+                    SubscriptionRequestStatusCode.PENDING, lastMonthStart, thisMonthStart);
+        } catch (Exception e) {
+            log.warn("Erreur lors du calcul des indicateurs Super Admin", e);
+        }
+
+        String monthlyRevenue = formatMoneyFcfa(revenueThisMonth);
+        String companiesChange = formatMonthlyCountLabel(newCompaniesThisMonth, "entreprise", "entreprises");
+        String usersChange = formatMonthlyCountLabel(newUsersThisMonth, "utilisateur", "utilisateurs");
+        String revenueChange = formatPercentChange(revenueThisMonth, revenueLastMonth);
+        String ticketsChange = formatPercentChange(newPendingThisMonth, newPendingLastMonth);
+
         java.time.LocalDateTime sixMonthsAgo = java.time.LocalDateTime.now().minusMonths(6);
         List<SuperAdminDashboardStatsDTO.MonthlyCompanyData> monthlyData = new ArrayList<>();
         try {
@@ -267,10 +294,10 @@ public class DashboardService {
                 .monthlySubscriptionsData(monthlySubscriptionsData)
                 .planDistribution(planData)
                 .recentCompanies(recentCompaniesDTO)
-                .companiesChange("+0")
-                .usersChange("+0%")
-                .revenueChange("+0%")
-                .ticketsChange("0")
+                .companiesChange(companiesChange)
+                .usersChange(usersChange)
+                .revenueChange(revenueChange)
+                .ticketsChange(ticketsChange)
                 .build();
     }
     
@@ -282,9 +309,7 @@ public class DashboardService {
     
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     private Long countTotalUsers() {
-        return userRepository.findAll().stream()
-                .filter(u -> u != null && !u.getIsDeleted() && !u.isSuperAdmin())
-                .count();
+        return userRepository.countNonSuperAdminNotDeleted();
     }
     
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
@@ -683,5 +708,44 @@ public class DashboardService {
                 .createdAt(createdAtStr)
                 .status(company.getStatus() != null ? company.getStatus().getLabel() : "N/A")
                 .build();
+    }
+
+    private static double safeAmount(Double value) {
+        return value != null ? value : 0D;
+    }
+
+    private static String formatMoneyFcfa(double amount) {
+        return String.format("%,.0f", amount).replace('\u00a0', ' ').replace(',', ' ') + " FCFA";
+    }
+
+    private static String formatMonthlyCountLabel(long count, String singular, String plural) {
+        if (count <= 0) {
+            return "Aucun nouveau ce mois";
+        }
+        if (count == 1) {
+            return "+1 " + singular + " ce mois";
+        }
+        return "+" + count + " " + plural + " ce mois";
+    }
+
+    private static String formatPercentChange(long current, long previous) {
+        return formatPercentChange((double) current, (double) previous);
+    }
+
+    private static String formatPercentChange(double current, double previous) {
+        if (previous <= 0D) {
+            if (current <= 0D) {
+                return "Stable";
+            }
+            return "+100% vs mois dernier";
+        }
+        double pct = ((current - previous) * 100D) / previous;
+        if (Math.abs(pct) < 0.5D) {
+            return "Stable";
+        }
+        if (pct > 0D) {
+            return String.format("+%.0f%% vs mois dernier", pct);
+        }
+        return String.format("%.0f%% vs mois dernier", pct);
     }
 }

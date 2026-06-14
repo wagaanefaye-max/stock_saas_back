@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -158,5 +159,13 @@ public interface CompanyRepository extends JpaRepository<Company, Long> {
             AND LOWER(c.status.code) IN ('actif')
             """)
     long countActiveNotDeleted();
+
+    @Query("""
+            SELECT COUNT(c) FROM Company c
+            WHERE c.isDeleted = false
+            AND c.createdAt >= :start
+            AND c.createdAt < :end
+            """)
+    long countCreatedBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
 }

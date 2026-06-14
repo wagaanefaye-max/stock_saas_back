@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -90,4 +91,16 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("SELECT u FROM User u JOIN FETCH u.role WHERE u.isDeleted = false " +
            "AND u.role.code = 'SUPER_ADMIN' AND u.email IS NOT NULL")
     List<User> findActiveSuperAdmins();
+
+    @Query("SELECT COUNT(u) FROM User u WHERE u.isDeleted = false AND u.role.code <> 'SUPER_ADMIN'")
+    long countNonSuperAdminNotDeleted();
+
+    @Query("""
+            SELECT COUNT(u) FROM User u
+            WHERE u.isDeleted = false
+            AND u.role.code <> 'SUPER_ADMIN'
+            AND u.createdAt >= :start
+            AND u.createdAt < :end
+            """)
+    long countNonSuperAdminCreatedBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 }
