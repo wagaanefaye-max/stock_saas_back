@@ -151,4 +151,12 @@ public interface CompanyRepository extends JpaRepository<Company, Long> {
     @Query("SELECT c FROM Company c WHERE c.isDeleted = false AND c.notifReports = true")
     List<Company> findActiveWithWeeklyReportEnabled();
 
+    @Query("""
+            SELECT COUNT(c) FROM Company c
+            WHERE c.isDeleted = false
+            AND c.status IS NOT NULL
+            AND LOWER(c.status.code) IN ('actif')
+            """)
+    long countActiveNotDeleted();
+
 }

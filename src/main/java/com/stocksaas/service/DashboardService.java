@@ -277,11 +277,7 @@ public class DashboardService {
     // Méthodes helper isolées dans leurs propres transactions
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     private Long countActiveCompanies() {
-        return companyRepository.findAll().stream()
-                .filter(c -> c != null && !c.getIsDeleted() && 
-                           c.getStatus() != null && 
-                           "ACTIF".equals(c.getStatus().getCode()))
-                .count();
+        return companyRepository.countActiveNotDeleted();
     }
     
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
