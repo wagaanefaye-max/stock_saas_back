@@ -80,7 +80,8 @@ public class ProductController {
             @RequestParam(required = false) String sku,
             @RequestParam(required = false) String categoryCode,
             @RequestParam(required = false) @DateTimeFormat(iso = ISO.DATE) LocalDate dateFrom,
-            @RequestParam(required = false) @DateTimeFormat(iso = ISO.DATE) LocalDate dateTo) {
+            @RequestParam(required = false) @DateTimeFormat(iso = ISO.DATE) LocalDate dateTo,
+            @RequestParam(required = false) Boolean lowStock) {
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             if (authentication == null || authentication.getName() == null) {
@@ -98,11 +99,12 @@ public class ProductController {
                     || (sku != null && !sku.isBlank())
                     || (categoryCode != null && !categoryCode.isBlank())
                     || dateFrom != null
-                    || dateTo != null;
+                    || dateTo != null
+                    || Boolean.TRUE.equals(lowStock);
 
             if (page != null && size != null && size > 0) {
                 PageResponse<ProductDTO> response = productService.getProductsPaged(
-                        companyId, page, size, name, reference, sku, categoryCode, dateFrom, dateTo);
+                        companyId, page, size, name, reference, sku, categoryCode, dateFrom, dateTo, lowStock);
                 return ResponseEntity.ok(response);
             }
 
@@ -111,7 +113,7 @@ public class ProductController {
                 log.debug("Filtrage des produits - name: {}, reference: {}, sku: {}, categoryCode: {}, dateFrom: {}, dateTo: {}",
                         name, reference, sku, categoryCode, dateFrom, dateTo);
                 products = productService.getAllProductsByCompanyWithFilters(
-                        companyId, name, reference, sku, categoryCode, dateFrom, dateTo);
+                        companyId, name, reference, sku, categoryCode, dateFrom, dateTo, lowStock);
             } else {
                 products = productService.getAllProductsByCompany(companyId);
             }

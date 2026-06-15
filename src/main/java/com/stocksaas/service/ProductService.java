@@ -26,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.stocksaas.util.ProductReferenceUtil;
 
 import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Subquery;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -183,8 +184,8 @@ public class ProductService {
     @Transactional(readOnly = true)
     public PageResponse<ProductDTO> getProductsPaged(Long companyId, int page, int size,
             String name, String reference, String sku, String categoryCode,
-            LocalDate dateFrom, LocalDate dateTo) {
-        Specification<Product> spec = buildProductSpecification(companyId, name, reference, sku, categoryCode, dateFrom, dateTo);
+            LocalDate dateFrom, LocalDate dateTo, Boolean lowStock) {
+        Specification<Product> spec = buildProductSpecification(companyId, name, reference, sku, categoryCode, dateFrom, dateTo, lowStock);
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
         Page<Product> productPage = productRepository.findAll(spec, pageable);
         return PageResponse.<ProductDTO>builder()
@@ -205,8 +206,8 @@ public class ProductService {
     @Transactional(readOnly = true)
     public List<ProductDTO> getAllProductsByCompanyWithFilters(Long companyId,
             String name, String reference, String sku, String categoryCode,
-            LocalDate dateFrom, LocalDate dateTo) {
-        Specification<Product> spec = buildProductSpecification(companyId, name, reference, sku, categoryCode, dateFrom, dateTo);
+            LocalDate dateFrom, LocalDate dateTo, Boolean lowStock) {
+        Specification<Product> spec = buildProductSpecification(companyId, name, reference, sku, categoryCode, dateFrom, dateTo, lowStock);
         List<Product> products = productRepository.findAll(spec);
         log.debug("Produits trouvés après filtrage: {}", products.size());
         return products.stream()
@@ -216,13 +217,27 @@ public class ProductService {
 
     private Specification<Product> buildProductSpecification(Long companyId,
             String name, String reference, String sku, String categoryCode,
-            LocalDate dateFrom, LocalDate dateTo) {
+            LocalDate dateFrom, LocalDate dateTo, Boolean lowStock) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             
             // Filtre obligatoire : companyId et isDeleted = false
             predicates.add(cb.equal(root.get("company").get("id"), companyId));
             predicates.add(cb.equal(root.get("isDeleted"), false));
+
+            if (Boolean.TRUE.equals(lowStock)) {
+                Subquery<Long> lowStockSubquery = query.subquery(Long.class);
+                var stockRoot = lowStockSubquery.from(StockLevel.class);
+                lowStockSubquery.select(stockRoot.get("product").get("id"));
+                lowStockSubquery.where(
+                        cb.equal(stockRoot.get("product").get("id"), root.get("id")),
+                        cb.equal(stockRoot.get("isDeleted"), false),
+                        cb.equal(stockRoot.get("warehouse").get("isDeleted"), false),
+                        cb.greaterThan(stockRoot.get("minThreshold"), BigDecimal.ZERO),
+                        cb.lessThanOrEqualTo(stockRoot.get("quantity"), stockRoot.get("minThreshold"))
+                );
+                predicates.add(cb.exists(lowStockSubquery));
+            }
             
             // Filtre par nom (LIKE insensible à la casse)
             if (name != null && !name.isBlank()) {
