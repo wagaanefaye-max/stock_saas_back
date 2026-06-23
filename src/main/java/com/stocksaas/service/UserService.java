@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,7 +48,7 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public PageResponse<UserDTO> getGestionnairesByCompany(Long companyId, int page, int size, String search) {
-        Pageable pageable = PageRequest.of(page, size);
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
         Page<User> userPage = (search != null && !search.trim().isEmpty())
                 ? userRepository.findGestionnairesByCompanyIdWithSearch(companyId, search.trim(), pageable)
                 : userRepository.findGestionnairesByCompanyId(companyId, pageable);
@@ -59,7 +60,7 @@ public class UserService {
      */
     @Transactional(readOnly = true)
     public PageResponse<UserDTO> getAllUsersExceptSuperAdmin(int page, int size, String search) {
-        Pageable pageable = PageRequest.of(page, size);
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
         Page<User> userPage;
         
         if (search != null && !search.trim().isEmpty()) {
