@@ -2,8 +2,10 @@ package com.stocksaas.service;
 
 import com.stocksaas.dto.CompanyDTO;
 import com.stocksaas.dto.PageResponse;
+import com.stocksaas.dto.ProofResourceResult;
 import com.stocksaas.dto.UpdateCompanyRequest;
 import com.stocksaas.dto.UpdateCompanyStatusRequest;
+import com.stocksaas.exception.ProofNotFoundException;
 import com.stocksaas.model.Company;
 import com.stocksaas.model.CompanyStatus;
 import com.stocksaas.model.User;
@@ -17,7 +19,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 
@@ -31,6 +35,7 @@ public class CompanyService {
     private final CompanyRepository companyRepository;
     private final CompanyStatusRepository companyStatusRepository;
     private final SubscriptionPlanRepository subscriptionPlanRepository;
+    private final CompanyLogoStorageService companyLogoStorageService;
     
     /**
      * Récupère toutes les entreprises avec pagination (DTO retournés directement par le repository, une requête).
@@ -107,6 +112,44 @@ public class CompanyService {
         }
         
         return mapToDTO(companyRepository.save(company));
+    }
+
+    @Transactional
+    public CompanyDTO uploadCompanyLogo(Long id, MultipartFile image) throws IOException {
+        Company company = getActiveCompany(id);
+        companyLogoStorageService.storeLogo(id, image);
+        company.setLogoUrl(buildLogoApiUrl(id));
+        return mapToDTO(companyRepository.save(company));
+    }
+
+    @Transactional
+    public CompanyDTO deleteCompanyLogo(Long id) throws IOException {
+        Company company = getActiveCompany(id);
+        companyLogoStorageService.deleteLogo(id);
+        company.setLogoUrl(null);
+        return mapToDTO(companyRepository.save(company));
+    }
+
+    @Transactional(readOnly = true)
+    public ProofResourceResult getCompanyLogo(Long id) throws IOException {
+        Company company = getActiveCompany(id);
+        if (company.getLogoUrl() == null || company.getLogoUrl().isBlank()) {
+            throw new ProofNotFoundException("Logo non disponible pour cette entreprise");
+        }
+        return companyLogoStorageService.loadLogo(id);
+    }
+
+    private Company getActiveCompany(Long id) {
+        Company company = companyRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Entreprise non trouvée avec l'ID: " + id));
+        if (company.getIsDeleted()) {
+            throw new RuntimeException("L'entreprise a été supprimée");
+        }
+        return company;
+    }
+
+    private static String buildLogoApiUrl(Long companyId) {
+        return "/api/companies/" + companyId + "/logo";
     }
     
     /**

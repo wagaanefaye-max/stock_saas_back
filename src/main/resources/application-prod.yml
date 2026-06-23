@@ -68,3 +68,4 @@ app:
   upload:
     # Dossier persistant sur le serveur (survit aux redéploiements Docker)
     subscriptions-dir: ${APP_UPLOAD_SUBSCRIPTIONS_DIR:/home/ubuntu/justificatifs}
+    companies-logos-dir: ${APP_UPLOAD_COMPANIES_LOGOS_DIR:/home/ubuntu/company-logos}

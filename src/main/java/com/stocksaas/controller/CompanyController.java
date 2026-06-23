@@ -13,9 +13,12 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Map;
 
@@ -104,6 +107,58 @@ public class CompanyController {
     public ResponseEntity<Void> deleteCompany(@PathVariable Long id) {
         companyService.deleteCompany(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping(value = "/{id}/logo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN_ENTREPRISE')")
+    @Operation(summary = "Téléverser le logo de l'entreprise")
+    public ResponseEntity<?> uploadCompanyLogo(
+            @PathVariable Long id,
+            @RequestPart("image") MultipartFile image) {
+        try {
+            assertCanAccessCompany(id);
+            CompanyDTO updated = companyService.uploadCompanyLogo(id, image);
+            return ResponseEntity.ok(updated);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("message", "Impossible d'enregistrer le logo"));
+        }
+    }
+
+    @DeleteMapping("/{id}/logo")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN_ENTREPRISE')")
+    @Operation(summary = "Supprimer le logo de l'entreprise")
+    public ResponseEntity<?> deleteCompanyLogo(@PathVariable Long id) {
+        try {
+            assertCanAccessCompany(id);
+            CompanyDTO updated = companyService.deleteCompanyLogo(id);
+            return ResponseEntity.ok(updated);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("message", "Impossible de supprimer le logo"));
+        }
+    }
+
+    @GetMapping("/{id}/logo")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN_ENTREPRISE', 'GESTIONNAIRE')")
+    @Operation(summary = "Afficher le logo de l'entreprise")
+    public ResponseEntity<?> getCompanyLogo(@PathVariable Long id) {
+        try {
+            assertCanAccessCompany(id);
+            var logo = companyService.getCompanyLogo(id);
+            return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType(logo.contentType()))
+                    .header(HttpHeaders.CACHE_CONTROL, "private, max-age=3600")
+                    .body(logo.resource());
+        } catch (com.stocksaas.exception.ProofNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("message", "Impossible de charger le logo"));
+        }
     }
 
     private User assertCanAccessCompany(Long companyId) {
