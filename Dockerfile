@@ -13,8 +13,11 @@ WORKDIR /app
 
 COPY --from=build /app/target/*.jar app.jar
 
-# Monter le volume hôte : /home/ubuntu/justificatifs:/home/ubuntu/justificatifs
+# Monter les volumes hôte :
+#   /home/ubuntu/justificatifs:/home/ubuntu/justificatifs
+#   /home/ubuntu/company-logos:/home/ubuntu/company-logos
 ENV APP_UPLOAD_SUBSCRIPTIONS_DIR=/home/ubuntu/justificatifs
+ENV APP_UPLOAD_COMPANIES_LOGOS_DIR=/home/ubuntu/company-logos
 
 EXPOSE 8080
 

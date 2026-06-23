@@ -37,6 +37,10 @@ echo ">> Configuration du service systemd sur le VPS..."
 ssh ${VPS_USER}@${VPS_HOST} "sudo bash -s" <<EOF
 set -e
 
+# Dossiers persistants (hors du jar) pour fichiers uploadés
+mkdir -p /home/ubuntu/justificatifs /home/ubuntu/company-logos
+chown -R www-data:www-data /home/ubuntu/justificatifs /home/ubuntu/company-logos
+
 SERVICE_PATH="/etc/systemd/system/${SERVICE_NAME}"
 
 cat > "\${SERVICE_PATH}" <<EOL
@@ -51,6 +55,8 @@ ExecStart=/usr/bin/java -jar ${REMOTE_DIR}/${APP_NAME}.jar --spring.profiles.act
 Restart=always
 RestartSec=10
 Environment=JAVA_TOOL_OPTIONS=-Xms256m -Xmx512m
+Environment=APP_UPLOAD_SUBSCRIPTIONS_DIR=/home/ubuntu/justificatifs
+Environment=APP_UPLOAD_COMPANIES_LOGOS_DIR=/home/ubuntu/company-logos
 
 [Install]
 WantedBy=multi-user.target

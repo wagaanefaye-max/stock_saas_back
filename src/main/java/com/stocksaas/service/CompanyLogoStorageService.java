@@ -1,10 +1,13 @@
 package com.stocksaas.service;
 
 import com.stocksaas.dto.ProofResourceResult;
+import com.stocksaas.dto.StoredProofFile;
 import com.stocksaas.exception.ProofNotFoundException;
+import com.stocksaas.model.Company;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
@@ -15,7 +18,6 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.Set;
 
 @Service
@@ -42,7 +44,7 @@ public class CompanyLogoStorageService {
         log.info("Stockage des logos entreprise : {}", baseDir);
     }
 
-    public String storeLogo(Long companyId, MultipartFile file) throws IOException {
+    public StoredProofFile storeLogo(Long companyId, MultipartFile file) throws IOException {
         validateImage(file);
         deleteLogoFiles(companyId);
 
@@ -54,22 +56,23 @@ public class CompanyLogoStorageService {
             default -> "jpg";
         };
 
+        byte[] data = file.getBytes();
         String filename = "company-" + companyId + "." + extension;
         Path target = baseDir().resolve(filename);
-        Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
-        return filename;
+        Files.write(target, data);
+        return new StoredProofFile(filename, data, contentType);
     }
 
-    public ProofResourceResult loadLogo(Long companyId) throws IOException {
-        Path file = findLogoFile(companyId);
-        if (file == null) {
+    public ProofResourceResult loadLogo(Company company) throws IOException {
+        Resource resource = loadFromDisk(company.getId());
+        if (resource == null) {
+            resource = loadFromDatabase(company);
+        }
+        if (resource == null) {
             throw new ProofNotFoundException("Logo non disponible pour cette entreprise");
         }
-        Resource resource = new UrlResource(file.toUri());
-        if (!resource.exists() || !resource.isReadable()) {
-            throw new ProofNotFoundException("Logo non disponible pour cette entreprise");
-        }
-        return new ProofResourceResult(resource, resolveContentType(file));
+        String contentType = resolveContentType(company, resource);
+        return new ProofResourceResult(resource, contentType);
     }
 
     public void deleteLogo(Long companyId) throws IOException {
@@ -127,16 +130,47 @@ public class CompanyLogoStorageService {
         return contentType.toLowerCase().split(";")[0].trim();
     }
 
-    private static String resolveContentType(Path file) {
-        String name = file.getFileName().toString().toLowerCase();
-        if (name.endsWith(".png")) {
-            return "image/png";
+    private Resource loadFromDisk(Long companyId) throws IOException {
+        Path file = findLogoFile(companyId);
+        if (file == null) {
+            return null;
         }
-        if (name.endsWith(".webp")) {
-            return "image/webp";
+        Resource resource = new UrlResource(file.toUri());
+        if (resource.exists() && resource.isReadable()) {
+            return resource;
         }
-        if (name.endsWith(".gif")) {
-            return "image/gif";
+        return null;
+    }
+
+    private Resource loadFromDatabase(Company company) {
+        byte[] data = company.getLogoData();
+        if (data == null || data.length == 0) {
+            return null;
+        }
+        return new ByteArrayResource(data) {
+            @Override
+            public String getFilename() {
+                return "company-" + company.getId() + "-logo";
+            }
+        };
+    }
+
+    private String resolveContentType(Company company, Resource resource) throws IOException {
+        if (company.getLogoContentType() != null && !company.getLogoContentType().isBlank()) {
+            return company.getLogoContentType();
+        }
+        String filename = resource.getFilename();
+        if (filename != null) {
+            String name = filename.toLowerCase();
+            if (name.endsWith(".png")) {
+                return "image/png";
+            }
+            if (name.endsWith(".webp")) {
+                return "image/webp";
+            }
+            if (name.endsWith(".gif")) {
+                return "image/gif";
+            }
         }
         return "image/jpeg";
     }

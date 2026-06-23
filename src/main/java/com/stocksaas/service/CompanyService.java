@@ -117,8 +117,10 @@ public class CompanyService {
     @Transactional
     public CompanyDTO uploadCompanyLogo(Long id, MultipartFile image) throws IOException {
         Company company = getActiveCompany(id);
-        companyLogoStorageService.storeLogo(id, image);
+        var stored = companyLogoStorageService.storeLogo(id, image);
         company.setLogoUrl(buildLogoApiUrl(id));
+        company.setLogoData(stored.data());
+        company.setLogoContentType(stored.contentType());
         return mapToDTO(companyRepository.save(company));
     }
 
@@ -127,6 +129,8 @@ public class CompanyService {
         Company company = getActiveCompany(id);
         companyLogoStorageService.deleteLogo(id);
         company.setLogoUrl(null);
+        company.setLogoData(null);
+        company.setLogoContentType(null);
         return mapToDTO(companyRepository.save(company));
     }
 
@@ -136,7 +140,7 @@ public class CompanyService {
         if (company.getLogoUrl() == null || company.getLogoUrl().isBlank()) {
             throw new ProofNotFoundException("Logo non disponible pour cette entreprise");
         }
-        return companyLogoStorageService.loadLogo(id);
+        return companyLogoStorageService.loadLogo(company);
     }
 
     private Company getActiveCompany(Long id) {

@@ -53,6 +53,13 @@ public class Company extends BaseEntity {
     @Column(name = "logo_url", length = 500)
     private String logoUrl;
 
+    @Lob
+    @Column(name = "logo_data")
+    private byte[] logoData;
+
+    @Column(name = "logo_content_type", length = 100)
+    private String logoContentType;
+
     @Column(name = "notif_low_stock")
     private Boolean notifLowStock = true;
 
