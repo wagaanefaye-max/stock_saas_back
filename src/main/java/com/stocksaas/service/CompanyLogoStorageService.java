@@ -38,15 +38,22 @@ public class CompanyLogoStorageService {
     private String companiesLogosDir;
 
     @PostConstruct
-    void ensureStorageDirectory() throws IOException {
-        Path baseDir = Paths.get(companiesLogosDir).toAbsolutePath().normalize();
-        Files.createDirectories(baseDir);
-        log.info("Stockage des logos entreprise : {}", baseDir);
+    void ensureStorageDirectory() {
+        try {
+            Path baseDir = baseDir();
+            Files.createDirectories(baseDir);
+            log.info("Stockage des logos entreprise : {}", baseDir);
+        } catch (IOException e) {
+            log.warn(
+                    "Dossier logos inaccessible ({}) : {}. L'application démarre ; les logos seront lus depuis la base si besoin.",
+                    companiesLogosDir,
+                    e.getMessage()
+            );
+        }
     }
 
     public StoredProofFile storeLogo(Long companyId, MultipartFile file) throws IOException {
         validateImage(file);
-        deleteLogoFiles(companyId);
 
         String contentType = normalizeContentType(file.getContentType());
         String extension = switch (contentType) {
@@ -58,8 +65,7 @@ public class CompanyLogoStorageService {
 
         byte[] data = file.getBytes();
         String filename = "company-" + companyId + "." + extension;
-        Path target = baseDir().resolve(filename);
-        Files.write(target, data);
+        writeToDisk(companyId, filename, data);
         return new StoredProofFile(filename, data, contentType);
     }
 
@@ -173,5 +179,16 @@ public class CompanyLogoStorageService {
             }
         }
         return "image/jpeg";
+    }
+
+    private void writeToDisk(Long companyId, String filename, byte[] data) {
+        try {
+            deleteLogoFiles(companyId);
+            Path target = baseDir();
+            Files.createDirectories(target);
+            Files.write(target.resolve(filename), data);
+        } catch (IOException e) {
+            log.warn("Impossible d'écrire le logo sur disque ({}): {}", filename, e.getMessage());
+        }
     }
 }

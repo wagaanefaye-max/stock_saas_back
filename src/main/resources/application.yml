@@ -4,8 +4,8 @@ spring:
       enabled: false
     name: stock-saas-backend
   profiles:
-    # Profil actif par défaut (remplacer par -Dspring.profiles.active=prod en prod)dfsfsfs
-    active: prod
+    # En local : dev. En prod VPS : --spring.profiles.active=prod (voir deploy-to-vps.sh)
+    active: dev
   # Configuration DataSource par défaut (utilisée si aucun profil ou profil dev)
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/stock_saas_db}

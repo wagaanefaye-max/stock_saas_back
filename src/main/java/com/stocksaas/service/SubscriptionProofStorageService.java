@@ -17,7 +17,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.Set;
 import java.util.UUID;
 
@@ -38,10 +37,18 @@ public class SubscriptionProofStorageService {
     private String subscriptionsDir;
 
     @PostConstruct
-    void ensureStorageDirectory() throws IOException {
-        Path baseDir = Paths.get(subscriptionsDir).toAbsolutePath().normalize();
-        Files.createDirectories(baseDir);
-        log.info("Stockage des justificatifs de souscription : {}", baseDir);
+    void ensureStorageDirectory() {
+        try {
+            Path baseDir = baseDir();
+            Files.createDirectories(baseDir);
+            log.info("Stockage des justificatifs de souscription : {}", baseDir);
+        } catch (IOException e) {
+            log.warn(
+                    "Dossier justificatifs inaccessible ({}) : {}. L'application démarre ; les fichiers seront lus depuis la base si besoin.",
+                    subscriptionsDir,
+                    e.getMessage()
+            );
+        }
     }
 
     public StoredProofFile storeProof(MultipartFile file, Long companyId) throws IOException {
@@ -57,8 +64,6 @@ public class SubscriptionProofStorageService {
         }
 
         byte[] data = file.getBytes();
-        Path baseDir = Paths.get(subscriptionsDir).toAbsolutePath().normalize();
-        Files.createDirectories(baseDir);
 
         String extension = switch (contentType) {
             case "image/png" -> "png";
@@ -66,8 +71,7 @@ public class SubscriptionProofStorageService {
             default -> "jpg";
         };
         String filename = "company-" + companyId + "-" + UUID.randomUUID() + "." + extension;
-        Path target = baseDir.resolve(filename);
-        Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+        writeToDisk(filename, data);
         return new StoredProofFile(filename, data, contentType);
     }
 
@@ -130,5 +134,19 @@ public class SubscriptionProofStorageService {
             return "";
         }
         return contentType.toLowerCase();
+    }
+
+    private Path baseDir() {
+        return Paths.get(subscriptionsDir).toAbsolutePath().normalize();
+    }
+
+    private void writeToDisk(String filename, byte[] data) {
+        try {
+            Path target = baseDir();
+            Files.createDirectories(target);
+            Files.write(target.resolve(filename), data);
+        } catch (IOException e) {
+            log.warn("Impossible d'écrire le justificatif sur disque ({}): {}", filename, e.getMessage());
+        }
     }
 }
