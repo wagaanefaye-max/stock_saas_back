@@ -119,13 +119,17 @@ public interface StockLevelRepository extends JpaRepository<StockLevel, Long> {
 
     @Query(value = """
             SELECT COUNT(DISTINCT p.id)
-            FROM td_stock_levels sl
-            INNER JOIN td_products p ON p.id = sl.product_id
-            INNER JOIN td_warehouses w ON w.id = sl.warehouse_id
-            WHERE p.is_deleted = false
-            AND w.is_deleted = false
-            AND sl.is_deleted = false
-            AND sl.quantity <= 0
+            FROM td_products p
+            LEFT JOIN (
+                SELECT sl.product_id, COALESCE(SUM(sl.quantity), 0) AS total_qty
+                FROM td_stock_levels sl
+                INNER JOIN td_warehouses w ON w.id = sl.warehouse_id
+                WHERE w.is_deleted IS NOT TRUE
+                  AND sl.is_deleted IS NOT TRUE
+                GROUP BY sl.product_id
+            ) totals ON totals.product_id = p.id
+            WHERE p.is_deleted IS NOT TRUE
+              AND (totals.total_qty IS NULL OR totals.total_qty <= 0)
             """, nativeQuery = true)
     long countDistinctOutOfStockProductsPlatform();
 
@@ -134,48 +138,12 @@ public interface StockLevelRepository extends JpaRepository<StockLevel, Long> {
             FROM td_stock_levels sl
             INNER JOIN td_products p ON p.id = sl.product_id
             INNER JOIN td_warehouses w ON w.id = sl.warehouse_id
-            WHERE p.is_deleted = false
-            AND w.is_deleted = false
-            AND sl.is_deleted = false
+            WHERE p.is_deleted IS NOT TRUE
+            AND w.is_deleted IS NOT TRUE
+            AND sl.is_deleted IS NOT TRUE
             AND sl.min_threshold > 0
             AND sl.quantity <= sl.min_threshold
             """, nativeQuery = true)
     long countDistinctLowStockProductsPlatform();
 
-    @Query(value = """
-            SELECT c.id,
-                   c.name,
-                   COALESCE(r.out_of_stock_count, 0) AS out_of_stock_count,
-                   COALESCE(l.low_stock_count, 0) AS low_stock_count,
-                   (COALESCE(r.out_of_stock_count, 0) * 3 + COALESCE(l.low_stock_count, 0) * 2) AS risk_score
-            FROM td_companies c
-            LEFT JOIN (
-                SELECT p.company_id AS company_id, COUNT(DISTINCT p.id) AS out_of_stock_count
-                FROM td_stock_levels sl
-                INNER JOIN td_products p ON p.id = sl.product_id
-                INNER JOIN td_warehouses w ON w.id = sl.warehouse_id
-                WHERE p.is_deleted = false
-                  AND w.is_deleted = false
-                  AND sl.is_deleted = false
-                  AND sl.quantity <= 0
-                GROUP BY p.company_id
-            ) r ON r.company_id = c.id
-            LEFT JOIN (
-                SELECT p.company_id AS company_id, COUNT(DISTINCT p.id) AS low_stock_count
-                FROM td_stock_levels sl
-                INNER JOIN td_products p ON p.id = sl.product_id
-                INNER JOIN td_warehouses w ON w.id = sl.warehouse_id
-                WHERE p.is_deleted = false
-                  AND w.is_deleted = false
-                  AND sl.is_deleted = false
-                  AND sl.min_threshold > 0
-                  AND sl.quantity <= sl.min_threshold
-                GROUP BY p.company_id
-            ) l ON l.company_id = c.id
-            WHERE c.is_deleted = false
-              AND (COALESCE(r.out_of_stock_count, 0) > 0 OR COALESCE(l.low_stock_count, 0) > 0)
-            ORDER BY risk_score DESC, out_of_stock_count DESC, low_stock_count DESC, c.name ASC
-            LIMIT 5
-            """, nativeQuery = true)
-    List<Object[]> findTopCompaniesByProductRisk();
 }
