@@ -43,8 +43,9 @@ public class UserController {
     public ResponseEntity<PageResponse<UserDTO>> getAllUsers(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(required = false) String search) {
-        PageResponse<UserDTO> response = userService.listUsersForCurrentUser(page, size, search);
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String status) {
+        PageResponse<UserDTO> response = userService.listUsersForCurrentUser(page, size, search, status);
         return ResponseEntity.ok(response);
     }
     

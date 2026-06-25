@@ -54,6 +54,17 @@ public interface UserRepository extends JpaRepository<User, Long> {
            "OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')))")
     Page<User> findAllExceptSuperAdminWithSearch(@Param("search") String search, Pageable pageable);
 
+    @Query("SELECT u FROM User u WHERE u.isDeleted = false AND u.role.code != 'SUPER_ADMIN' AND u.status = :status")
+    Page<User> findAllExceptSuperAdminByStatus(@Param("status") String status, Pageable pageable);
+
+    @Query("SELECT u FROM User u WHERE u.isDeleted = false AND u.role.code != 'SUPER_ADMIN' " +
+           "AND (LOWER(u.name) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%'))) AND u.status = :status")
+    Page<User> findAllExceptSuperAdminWithSearchAndStatus(
+            @Param("search") String search,
+            @Param("status") String status,
+            Pageable pageable);
+
     /**
      * Gestionnaires d'une entreprise (pagination).
      */
@@ -69,6 +80,22 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Page<User> findGestionnairesByCompanyIdWithSearch(@Param("companyId") Long companyId,
                                                       @Param("search") String search,
                                                       Pageable pageable);
+
+    @Query("SELECT u FROM User u WHERE u.isDeleted = false AND u.company.id = :companyId " +
+           "AND u.role.code = 'GESTIONNAIRE' AND u.status = :status")
+    Page<User> findGestionnairesByCompanyIdAndStatus(
+            @Param("companyId") Long companyId,
+            @Param("status") String status,
+            Pageable pageable);
+
+    @Query("SELECT u FROM User u WHERE u.isDeleted = false AND u.company.id = :companyId AND u.role.code = 'GESTIONNAIRE' " +
+           "AND (LOWER(u.name) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%'))) AND u.status = :status")
+    Page<User> findGestionnairesByCompanyIdWithSearchAndStatus(
+            @Param("companyId") Long companyId,
+            @Param("search") String search,
+            @Param("status") String status,
+            Pageable pageable);
     
     /**
      * Compte les utilisateurs actifs d'une entreprise

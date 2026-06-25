@@ -38,20 +38,36 @@ public class UserService {
      * Liste paginée selon le rôle de l'appelant (super-admin : tous ; admin entreprise : gestionnaires de son entreprise).
      */
     @Transactional(readOnly = true)
-    public PageResponse<UserDTO> listUsersForCurrentUser(int page, int size, String search) {
+    public PageResponse<UserDTO> listUsersForCurrentUser(int page, int size, String search, String status) {
         User actor = securityAccessService.requireAdminEntrepriseOrSuperAdmin();
         if (actor.isSuperAdmin()) {
-            return getAllUsersExceptSuperAdmin(page, size, search);
+            return getAllUsersExceptSuperAdmin(page, size, search, status);
         }
-        return getGestionnairesByCompany(securityAccessService.requireCompanyId(actor), page, size, search);
+        return getGestionnairesByCompany(securityAccessService.requireCompanyId(actor), page, size, search, status);
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<UserDTO> getGestionnairesByCompany(Long companyId, int page, int size, String search) {
+    public PageResponse<UserDTO> getGestionnairesByCompany(
+            Long companyId,
+            int page,
+            int size,
+            String search,
+            String status
+    ) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
-        Page<User> userPage = (search != null && !search.trim().isEmpty())
-                ? userRepository.findGestionnairesByCompanyIdWithSearch(companyId, search.trim(), pageable)
-                : userRepository.findGestionnairesByCompanyId(companyId, pageable);
+        boolean hasSearch = search != null && !search.trim().isEmpty();
+        boolean hasStatus = status != null && !status.trim().isEmpty();
+        Page<User> userPage;
+        if (hasSearch && hasStatus) {
+            userPage = userRepository.findGestionnairesByCompanyIdWithSearchAndStatus(
+                    companyId, search.trim(), status.trim(), pageable);
+        } else if (hasSearch) {
+            userPage = userRepository.findGestionnairesByCompanyIdWithSearch(companyId, search.trim(), pageable);
+        } else if (hasStatus) {
+            userPage = userRepository.findGestionnairesByCompanyIdAndStatus(companyId, status.trim(), pageable);
+        } else {
+            userPage = userRepository.findGestionnairesByCompanyId(companyId, pageable);
+        }
         return toPageResponse(userPage);
     }
     
@@ -59,16 +75,23 @@ public class UserService {
      * Récupère tous les utilisateurs sauf les SUPER_ADMIN avec pagination
      */
     @Transactional(readOnly = true)
-    public PageResponse<UserDTO> getAllUsersExceptSuperAdmin(int page, int size, String search) {
+    public PageResponse<UserDTO> getAllUsersExceptSuperAdmin(int page, int size, String search, String status) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
+        boolean hasSearch = search != null && !search.trim().isEmpty();
+        boolean hasStatus = status != null && !status.trim().isEmpty();
         Page<User> userPage;
-        
-        if (search != null && !search.trim().isEmpty()) {
+
+        if (hasSearch && hasStatus) {
+            userPage = userRepository.findAllExceptSuperAdminWithSearchAndStatus(
+                    search.trim(), status.trim(), pageable);
+        } else if (hasSearch) {
             userPage = userRepository.findAllExceptSuperAdminWithSearch(search.trim(), pageable);
+        } else if (hasStatus) {
+            userPage = userRepository.findAllExceptSuperAdminByStatus(status.trim(), pageable);
         } else {
             userPage = userRepository.findAllExceptSuperAdmin(pageable);
         }
-        
+
         return toPageResponse(userPage);
     }
 
