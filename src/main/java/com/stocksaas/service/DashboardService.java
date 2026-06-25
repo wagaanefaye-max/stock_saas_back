@@ -284,6 +284,8 @@ public class DashboardService {
         } catch (Exception e) {
             log.warn("Erreur lors du mapping des entreprises récentes", e);
         }
+
+        SuperAdminDashboardStatsDTO.ProductInsights productInsights = buildProductInsights(thisMonthStart, nextMonthStart);
         
         return SuperAdminDashboardStatsDTO.builder()
                 .activeCompanies(activeCompanies)
@@ -294,6 +296,7 @@ public class DashboardService {
                 .monthlySubscriptionsData(monthlySubscriptionsData)
                 .planDistribution(planData)
                 .recentCompanies(recentCompaniesDTO)
+                .productInsights(productInsights)
                 .companiesChange(companiesChange)
                 .usersChange(usersChange)
                 .revenueChange(revenueChange)
@@ -603,6 +606,54 @@ public class DashboardService {
             default:
                 return planCode; // Retourner le code si non reconnu
         }
+    }
+
+    private SuperAdminDashboardStatsDTO.ProductInsights buildProductInsights(
+            LocalDateTime thisMonthStart,
+            LocalDateTime nextMonthStart
+    ) {
+        try {
+            Long totalProducts = productRepository.countAllNotDeleted();
+            Long newProductsThisMonth = productRepository.countCreatedBetween(thisMonthStart, nextMonthStart);
+            long outOfStockProducts = stockLevelRepository.countDistinctOutOfStockProductsPlatform();
+            long lowStockProducts = stockLevelRepository.countDistinctLowStockProductsPlatform();
+            Long priceAnomalies = productRepository.countPriceAnomalies();
+
+            List<SuperAdminDashboardStatsDTO.CompanyProductRiskDTO> topRiskCompanies = stockLevelRepository
+                    .findTopCompaniesByProductRisk()
+                    .stream()
+                    .map(this::mapToCompanyProductRiskDTO)
+                    .collect(Collectors.toList());
+
+            return SuperAdminDashboardStatsDTO.ProductInsights.builder()
+                    .totalProducts(totalProducts != null ? totalProducts : 0L)
+                    .newProductsThisMonth(newProductsThisMonth != null ? newProductsThisMonth : 0L)
+                    .outOfStockProducts(outOfStockProducts)
+                    .lowStockProducts(lowStockProducts)
+                    .priceAnomalies(priceAnomalies != null ? priceAnomalies : 0L)
+                    .topRiskCompanies(topRiskCompanies)
+                    .build();
+        } catch (Exception e) {
+            log.warn("Erreur lors de la construction des insights produits", e);
+            return SuperAdminDashboardStatsDTO.ProductInsights.builder()
+                    .totalProducts(0L)
+                    .newProductsThisMonth(0L)
+                    .outOfStockProducts(0L)
+                    .lowStockProducts(0L)
+                    .priceAnomalies(0L)
+                    .topRiskCompanies(new ArrayList<>())
+                    .build();
+        }
+    }
+
+    private SuperAdminDashboardStatsDTO.CompanyProductRiskDTO mapToCompanyProductRiskDTO(Object[] row) {
+        return SuperAdminDashboardStatsDTO.CompanyProductRiskDTO.builder()
+                .companyId(row[0] != null ? ((Number) row[0]).longValue() : null)
+                .companyName(row[1] != null ? row[1].toString() : "N/A")
+                .outOfStockProducts(row[2] != null ? ((Number) row[2]).longValue() : 0L)
+                .lowStockProducts(row[3] != null ? ((Number) row[3]).longValue() : 0L)
+                .riskScore(row[4] != null ? ((Number) row[4]).longValue() : 0L)
+                .build();
     }
     
     private DashboardStatsDTO.RecentMovementDTO mapToRecentMovementDTO(Movement movement) {

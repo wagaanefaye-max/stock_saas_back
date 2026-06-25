@@ -27,6 +27,9 @@ public class SuperAdminDashboardStatsDTO {
     
     // Entreprises récentes
     private List<RecentCompanyDTO> recentCompanies;
+
+    // Santé produits (vue plateforme)
+    private ProductInsights productInsights;
     
     // Variations
     private String companiesChange;
@@ -74,5 +77,30 @@ public class SuperAdminDashboardStatsDTO {
         private String plan;
         private String createdAt;
         private String status;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class ProductInsights {
+        private Long totalProducts;
+        private Long newProductsThisMonth;
+        private Long outOfStockProducts;
+        private Long lowStockProducts;
+        private Long priceAnomalies;
+        private List<CompanyProductRiskDTO> topRiskCompanies;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class CompanyProductRiskDTO {
+        private Long companyId;
+        private String companyName;
+        private Long outOfStockProducts;
+        private Long lowStockProducts;
+        private Long riskScore;
     }
 }

@@ -28,6 +28,21 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
     @Query("SELECT COUNT(p) FROM Product p WHERE p.company.id = :companyId AND p.isDeleted = false")
     Long countByCompanyIdAndNotDeleted(@Param("companyId") Long companyId);
 
+    @Query("SELECT COUNT(p) FROM Product p WHERE p.isDeleted = false")
+    Long countAllNotDeleted();
+
+    @Query("SELECT COUNT(p) FROM Product p WHERE p.isDeleted = false AND p.createdAt >= :startDate AND p.createdAt < :endDate")
+    Long countCreatedBetween(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
+
+    @Query("""
+            SELECT COUNT(p) FROM Product p
+            WHERE p.isDeleted = false
+            AND p.price IS NOT NULL
+            AND p.purchasePrice IS NOT NULL
+            AND p.price < p.purchasePrice
+            """)
+    Long countPriceAnomalies();
+
     /**
      * Liste des produits d'une entreprise non supprimés
      */
