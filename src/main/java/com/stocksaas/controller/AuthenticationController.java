@@ -5,7 +5,6 @@ import com.stocksaas.dto.AuthResponse;
 import com.stocksaas.dto.ForgotPasswordRequest;
 import com.stocksaas.dto.LoginRequest;
 import com.stocksaas.dto.RegisterRequest;
-import com.stocksaas.dto.RegisterResponse;
 import com.stocksaas.dto.VerifyAccountRequest;
 import com.stocksaas.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -73,11 +72,15 @@ public class AuthenticationController {
     }
 
     @PostMapping("/register")
-    @Operation(summary = "Inscription", description = "Inscrit un nouvel utilisateur avec création d'entreprise. Un email de validation sera envoyé.")
+    @Operation(summary = "Inscription", description = "Inscrit une entreprise, crée le compte admin et connecte l'utilisateur (cookie HttpOnly)")
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
         try {
-            RegisterResponse response = authService.register(request);
-            return ResponseEntity.ok(response);
+            AuthResponse response = authService.register(request);
+            String token = response.getToken();
+            response.setToken(null);
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.SET_COOKIE, authCookieFactory.createTokenCookie(token).toString())
+                    .body(response);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         } catch (Exception e) {

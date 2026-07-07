@@ -1,5 +1,6 @@
 package com.stocksaas.dto;
 
+import com.stocksaas.validation.StrongPassword;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -22,8 +23,15 @@ public class RegisterRequest {
     @Email(message = "L'email doit être valide")
     @NotBlank(message = "L'email est obligatoire")
     private String email;
+
+    @NotBlank(message = "Le mot de passe est obligatoire")
+    @StrongPassword
+    private String password;
+
+    /** Confirmation du mot de passe (vérifiée côté backend) */
+    private String passwordConfirmation;
     
-    // Informations entreprise (optionnel pour l'inscription)
+    // Informations entreprise (optionnel pour l'inscription express)
     private String companyName;
     private String companyEmail;
     private String companyPhone;

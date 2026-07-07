@@ -5,7 +5,6 @@ import com.stocksaas.dto.AuthResponse;
 import com.stocksaas.dto.CreateCompanyRequest;
 import com.stocksaas.dto.LoginRequest;
 import com.stocksaas.dto.RegisterRequest;
-import com.stocksaas.dto.RegisterResponse;
 import com.stocksaas.dto.VerifyAccountRequest;
 import com.stocksaas.model.Company;
 import com.stocksaas.model.CompanyStatus;
@@ -130,15 +129,20 @@ public class AuthService {
     }
     
     /**
-     * Inscrit un nouvel utilisateur avec création d'entreprise
+     * Inscrit un nouvel utilisateur avec création d'entreprise et connexion immédiate.
      */
     @Transactional
-    public RegisterResponse register(RegisterRequest request) {
+    public AuthResponse register(RegisterRequest request) {
         if (platformSettingsService.isMaintenanceModeEnabled()) {
             throw new RuntimeException("Les inscriptions sont suspendues pendant la maintenance de la plateforme.");
         }
         if (!platformSettingsService.isAllowNewRegistrations()) {
             throw new RuntimeException("Les nouvelles inscriptions sont temporairement fermées.");
+        }
+
+        if (request.getPasswordConfirmation() != null
+                && !request.getPassword().equals(request.getPasswordConfirmation())) {
+            throw new RuntimeException("Le mot de passe et la confirmation ne correspondent pas");
         }
 
         // Refuser les adresses jetables (yopmail, mailinator, etc.)
@@ -188,35 +192,40 @@ public class AuthService {
         UserRole adminRole = userRoleRepository.findById("ADMIN_ENTREPRISE")
                 .orElseThrow(() -> new RuntimeException("Rôle ADMIN_ENTREPRISE non trouvé"));
         
-        // Créer l'utilisateur (sans mot de passe pour l'instant)
+        // Créer l'utilisateur avec mot de passe (compte actif immédiatement)
         User user = new User();
         user.setCompany(company);
         user.setEmail(request.getEmail());
-        user.setPassword(null); // Le mot de passe sera défini lors de la validation
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setName(request.getName());
         user.setRole(adminRole);
-        user.setStatus("Inactif"); // Inactif jusqu'à validation du compte
+        user.setStatus("Actif");
         user.setIsDeleted(false);
         user = userRepository.save(user);
-        
-        // Générer un token de réinitialisation / activation (valide 2 jours)
-        String verificationToken = generateVerificationToken();
-        UserVerificationToken tokenEntity = new UserVerificationToken();
-        tokenEntity.setToken(verificationToken);
-        tokenEntity.setUser(user);
-        tokenEntity.setExpiresAt(LocalDateTime.now().plusDays(2));
-        tokenEntity.setUsed(false);
-        verificationTokenRepository.save(tokenEntity);
-        
-        // Envoyer un email avec lien de réinitialisation (définir mot de passe)
-        emailService.sendAccountVerificationEmail(user.getEmail(), user.getName(), company.getName(), verificationToken);
-        
-        // Retourner une réponse de succès (sans token JWT, l'utilisateur doit d'abord valider son compte)
-        return RegisterResponse.builder()
-                .message("Un email a été envoyé avec un lien de réinitialisation (valide 2 jours). Cliquez sur le lien pour définir votre mot de passe puis connectez-vous.")
+
+        user = userRepository.findByEmailWithCompanyAndRole(user.getEmail())
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+        String jwtToken = jwtUtil.generateToken(
+                user.getEmail(),
+                user.getRole().getCode(),
+                user.getId(),
+                company.getId()
+        );
+
+        emailService.sendAccountActivatedEmail(user.getEmail(), user.getName());
+
+        AuthResponse response = AuthResponse.builder()
+                .token(jwtToken)
+                .type("Bearer")
                 .email(user.getEmail())
+                .name(user.getName())
+                .role(user.getRole().getCode())
+                .companyId(company.getId())
                 .companyName(company.getName())
                 .build();
+        subscriptionService.enrichAuthResponse(response, user);
+        return response;
     }
 
     /**
