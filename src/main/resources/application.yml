@@ -44,7 +44,7 @@ server:
 app:
   base-url: ${APP_BASE_URL:http://localhost:4200}
   cors:
-    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:4200,http://localhost:3000,http://sen-stocksaas.com,https://sen-stocksaas.com,https://www.sen-stocksaas.com,http://164.132.43.247,https://164.132.43.247,http://164.132.43.247:4200}
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:4200,http://localhost:3000,http://sen-stocksaas.com,https://sen-stocksaas.com,https://www.sen-stocksaas.com,https://api-sen-stocksaas.com,http://164.132.43.247,https://164.132.43.247,http://164.132.43.247:4200}
   upload:
     subscriptions-dir: ${APP_UPLOAD_SUBSCRIPTIONS_DIR:uploads/subscriptions}
     companies-logos-dir: ${APP_UPLOAD_COMPANIES_LOGOS_DIR:uploads/companies/logos}

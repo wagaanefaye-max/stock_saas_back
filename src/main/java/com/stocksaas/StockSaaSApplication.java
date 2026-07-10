@@ -4,7 +4,9 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.admin.SpringApplicationAdminJmxAutoConfiguration;
 import org.springframework.boot.autoconfigure.jmx.JmxAutoConfiguration;
+import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
+import org.springframework.boot.web.servlet.support.SpringBootServletInitializer;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication(exclude = {
@@ -13,7 +15,12 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 })
 @ConfigurationPropertiesScan
 @EnableScheduling
-public class StockSaaSApplication {
+public class StockSaaSApplication extends SpringBootServletInitializer {
+
+    @Override
+    protected SpringApplicationBuilder configure(SpringApplicationBuilder builder) {
+        return builder.sources(StockSaaSApplication.class);
+    }
 
     public static void main(String[] args) {
         // Désactiver JMX pour éviter InstanceNotFoundException (connexions IDE/monitoring)
